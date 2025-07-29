@@ -1,0 +1,40 @@
+{
+  "name": "@cygnus-wealth/wallet-integration-system",
+  "version": "0.2.0",
+  "description": "Multi-chain wallet integration system for CygnusWealth",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "link-local": "./scripts/link-local.sh",
+    "use-published": "./scripts/use-published.sh",
+    "install-hooks": "./scripts/install-hooks.sh",
+    "prepush": "./scripts/pre-push"
+  },
+  "keywords": ["wallet", "blockchain", "ethereum", "solana", "sui", "web3"],
+  "author": "CygnusWealth",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@cygnus-wealth/data-models": "^0.0.3",
+    "ethers": "^6.11.1",
+    "viem": "^2.7.0",
+    "@solana/web3.js": "^1.91.0",
+    "@mysten/sui.js": "^0.54.0",
+    "axios": "^1.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0",
+    "@vitest/ui": "^1.2.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0"
+  }
+}

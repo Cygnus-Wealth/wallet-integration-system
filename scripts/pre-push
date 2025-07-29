@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Git pre-push hook to ensure no local dependencies are being pushed
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# Check if package.json contains file: references
+if grep -q '"file:' package.json; then
+    echo -e "${RED}Error: Local file references found in package.json${NC}"
+    echo -e "${RED}Please switch to published packages before pushing.${NC}"
+    echo ""
+    echo -e "${YELLOW}Run: npm run use-published${NC}"
+    exit 1
+fi
+
+# Check if any npm linked packages exist
+if [ -L "node_modules/@cygnus-wealth/data-models" ]; then
+    echo -e "${RED}Error: @cygnus-wealth/data-models is currently linked${NC}"
+    echo -e "${RED}Linked packages should not be pushed to the repository.${NC}"
+    echo ""
+    echo -e "${YELLOW}To fix this, run: npm run use-published${NC}"
+    exit 1
+fi
+
+# Check package-lock.json for file: references
+if [ -f "package-lock.json" ] && grep -q '"file:' package-lock.json; then
+    echo -e "${RED}Error: Local file references found in package-lock.json${NC}"
+    echo -e "${RED}Please regenerate package-lock.json with published packages.${NC}"
+    echo ""
+    echo -e "${YELLOW}Run: npm run use-published${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ No local dependencies detected - OK to push${NC}"
