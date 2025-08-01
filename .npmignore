@@ -1,0 +1,32 @@
+# Source files (we publish built files)
+src/
+examples/
+scripts/
+
+# Config files
+tsconfig.json
+.gitignore
+.npmignore
+
+# Development files
+*.log
+*.tmp
+.DS_Store
+node_modules/
+coverage/
+.nyc_output/
+
+# Documentation
+*.md
+!README.md
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Build files
+*.tsbuildinfo
