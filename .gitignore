@@ -28,6 +28,9 @@ build/
 # Testing
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+src/test/e2e/extensions/
 
 # Temporary files
 *.tmp

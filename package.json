@@ -9,6 +9,8 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "test:watch": "vitest watch",
+    "test:e2e": "vitest run src/test/e2e/modern-dapp-e2e.test.ts",
+    "test:e2e:mock": "tsx src/test/e2e/mock-wallet-test.ts",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "link-local": "./scripts/link-local.sh",
@@ -36,12 +38,18 @@
     "viem": "^2.7.0"
   },
   "devDependencies": {
+    "@metamask/test-dapp": "^9.4.0",
     "@types/node": "^20.11.0",
+    "@types/puppeteer": "^5.4.7",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
-    "@vitest/ui": "^1.2.0",
+    "@vitest/ui": "^3.2.4",
+    "dotenv": "^17.2.1",
     "eslint": "^8.56.0",
+    "jsdom": "^26.1.0",
+    "puppeteer": "^24.15.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.0"
+    "vitest": "^3.2.4"
   }
 }
