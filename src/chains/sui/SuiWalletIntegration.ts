@@ -5,7 +5,8 @@ import {
   WalletConnection, 
   WalletBalance,
   TokenInfo,
-  Account
+  Account,
+  WalletIntegrationConfig
 } from '../../types';
 import { CHAIN_CONFIGS } from '../../utils/constants';
 import { createAssetFromToken, createWalletBalance } from '../../utils/mappers';
@@ -36,10 +37,12 @@ export class SuiWalletIntegration implements WalletIntegration {
   
   constructor(
     public chain: Chain = Chain.SUI,
-    public source: IntegrationSource
+    public source: IntegrationSource,
+    config?: WalletIntegrationConfig
   ) {
-    const config = CHAIN_CONFIGS[Chain.SUI];
-    this.client = new SuiClient({ url: config?.rpcUrl || getFullnodeUrl('mainnet') });
+    const chainConfig = CHAIN_CONFIGS[Chain.SUI];
+    const rpcUrl = config?.rpcUrl || chainConfig?.rpcUrl || getFullnodeUrl('mainnet');
+    this.client = new SuiClient({ url: rpcUrl });
   }
 
   async connect(): Promise<WalletConnection> {

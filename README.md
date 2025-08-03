@@ -39,6 +39,22 @@ const balances = await walletManager.getAllBalances();
 await walletManager.disconnectWallet(Chain.ETHEREUM);
 ```
 
+### Using Custom RPC Endpoints
+
+```typescript
+import { WalletManager, WalletIntegrationConfig } from '@cygnus-wealth/wallet-integration-system';
+
+// Configure custom RPC (useful for Solana and Sui)
+const config: WalletIntegrationConfig = {
+  rpcUrl: 'https://rpc.ankr.com/solana' // Example: Ankr's Solana RPC
+};
+
+const walletManager = new WalletManager(config);
+
+// Connect with custom RPC
+await walletManager.connectWallet(Chain.SOLANA, IntegrationSource.PHANTOM);
+```
+
 ### Portfolio Value Calculation
 
 ```typescript

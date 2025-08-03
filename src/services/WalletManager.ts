@@ -6,7 +6,8 @@ import {
   WalletBalance,
   WalletIntegration,
   WalletInstance,
-  Account
+  Account,
+  WalletIntegrationConfig
 } from '../types';
 import { EVMWalletIntegration } from '../chains/evm/EVMWalletIntegration';
 import { SolanaWalletIntegration } from '../chains/solana/SolanaWalletIntegration';
@@ -22,6 +23,11 @@ interface WalletData {
 export class WalletManager implements MultiChainWalletManager {
   private wallets: Map<string, WalletData> = new Map();
   private activeWalletId: string | null = null;
+  private config?: WalletIntegrationConfig;
+
+  constructor(config?: WalletIntegrationConfig) {
+    this.config = config;
+  }
 
   async connectWallet(
     chain: Chain, 
@@ -240,14 +246,14 @@ export class WalletManager implements MultiChainWalletManager {
     source: IntegrationSource
   ): WalletIntegration {
     if (EVM_CHAINS.includes(chain)) {
-      return new EVMWalletIntegration(chain, source);
+      return new EVMWalletIntegration(chain, source, this.config);
     }
     
     switch (chain) {
       case Chain.SOLANA:
-        return new SolanaWalletIntegration(chain, source);
+        return new SolanaWalletIntegration(chain, source, this.config);
       case Chain.SUI:
-        return new SuiWalletIntegration(chain, source);
+        return new SuiWalletIntegration(chain, source, this.config);
       default:
         throw new Error(`Unsupported chain: ${chain}`);
     }

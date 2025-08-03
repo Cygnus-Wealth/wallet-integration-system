@@ -5,7 +5,8 @@ import {
   WalletConnection, 
   WalletBalance,
   TokenInfo,
-  Account 
+  Account,
+  WalletIntegrationConfig 
 } from '../../types';
 import { 
   CHAIN_CONFIGS, 
@@ -28,11 +29,14 @@ export class EVMWalletIntegration implements WalletIntegration {
   
   constructor(
     public chain: Chain,
-    public source: IntegrationSource
+    public source: IntegrationSource,
+    _config?: WalletIntegrationConfig // Unused for EVM as it uses injected provider
   ) {
     if (!EVM_CHAINS.includes(chain)) {
       throw new Error(`Chain ${chain} is not an EVM chain`);
     }
+    // EVM wallets use the injected provider (MetaMask, etc.) 
+    // which manages its own RPC connections
   }
 
   async connect(): Promise<WalletConnection> {

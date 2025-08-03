@@ -10,7 +10,8 @@ import {
   WalletConnection, 
   WalletBalance,
   TokenInfo,
-  Account
+  Account,
+  WalletIntegrationConfig
 } from '../../types';
 import { CHAIN_CONFIGS } from '../../utils/constants';
 import { createAssetFromToken, createWalletBalance } from '../../utils/mappers';
@@ -41,10 +42,12 @@ export class SolanaWalletIntegration implements WalletIntegration {
   
   constructor(
     public chain: Chain = Chain.SOLANA,
-    public source: IntegrationSource = IntegrationSource.PHANTOM
+    public source: IntegrationSource = IntegrationSource.PHANTOM,
+    config?: WalletIntegrationConfig
   ) {
-    const config = CHAIN_CONFIGS[Chain.SOLANA];
-    this.connection = new Connection(config?.rpcUrl || 'https://api.mainnet-beta.solana.com');
+    const chainConfig = CHAIN_CONFIGS[Chain.SOLANA];
+    const rpcUrl = config?.rpcUrl || chainConfig?.rpcUrl || 'https://api.mainnet-beta.solana.com';
+    this.connection = new Connection(rpcUrl);
   }
 
   async connect(): Promise<WalletConnection> {

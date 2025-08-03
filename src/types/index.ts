@@ -105,3 +105,8 @@ export interface TokenList {
   };
   tokens: TokenInfo[];
 }
+
+export interface WalletIntegrationConfig {
+  rpcUrl?: string;
+  // Future configuration options can be added here
+}
