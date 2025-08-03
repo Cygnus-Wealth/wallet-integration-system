@@ -4,7 +4,8 @@ import {
   WalletIntegration, 
   WalletConnection, 
   WalletBalance,
-  TokenInfo 
+  TokenInfo,
+  Account 
 } from '../../types';
 import { 
   CHAIN_CONFIGS, 
@@ -21,8 +22,9 @@ import './types';
 
 export class EVMWalletIntegration implements WalletIntegration {
   private provider: ethers.BrowserProvider | null = null;
-  private signer: ethers.JsonRpcSigner | null = null;
   private connected: boolean = false;
+  private accounts: Account[] = [];
+  private activeAccountIndex: number = 0;
   
   constructor(
     public chain: Chain,
@@ -54,21 +56,34 @@ export class EVMWalletIntegration implements WalletIntegration {
         await this.switchChain(chainConfig.chainId as number);
       }
 
-      const accounts = await this.provider.send('eth_requestAccounts', []);
+      const addresses = await this.provider.send('eth_requestAccounts', []);
       
-      if (accounts.length === 0) {
+      if (addresses.length === 0) {
         throw new Error('No accounts found');
       }
 
-      this.signer = await this.provider.getSigner();
+      // Create Account objects for all addresses
+      // Note: We cannot determine the actual derivation paths or which wallet/mnemonic
+      // each address belongs to. MetaMask returns all previously connected addresses
+      // across all configured wallets (mnemonics, hardware wallets, imported keys)
+      this.accounts = addresses.map((address: string, index: number) => ({
+        address: address.toLowerCase(),
+        index,
+        derivationPath: undefined, // Unknown - could be from any wallet/path
+        label: index === 0 ? 'Active Account' : `Connected Account ${index}`
+      }));
+
+      this.activeAccountIndex = 0;
       this.connected = true;
 
       return {
-        address: accounts[0],
+        address: this.accounts[0].address,
         chain: this.chain,
         source: this.source,
         connected: true,
-        connectedAt: new Date()
+        connectedAt: new Date(),
+        accounts: this.accounts,
+        activeAccount: this.accounts[0]
       };
     } catch (error) {
       this.connected = false;
@@ -78,23 +93,83 @@ export class EVMWalletIntegration implements WalletIntegration {
 
   async disconnect(): Promise<void> {
     this.provider = null;
-    this.signer = null;
     this.connected = false;
+    this.accounts = [];
+    this.activeAccountIndex = 0;
   }
 
   async getAddress(): Promise<string> {
-    if (!this.signer) {
+    if (!this.connected || this.accounts.length === 0) {
       throw new Error('Wallet not connected');
     }
-    return this.signer.getAddress();
+    return this.accounts[this.activeAccountIndex].address;
+  }
+
+  async getAllAccounts(): Promise<Account[]> {
+    if (!this.connected) {
+      throw new Error('Wallet not connected');
+    }
+    
+    // Try to get fresh account list from provider
+    if (this.provider && window.ethereum) {
+      try {
+        const addresses = await window.ethereum.request({ 
+          method: 'eth_accounts' 
+        });
+        
+        // Update accounts if changed
+        if (addresses.length !== this.accounts.length) {
+          this.accounts = addresses.map((address: string, index: number) => ({
+            address: address.toLowerCase(),
+            index,
+            derivationPath: undefined, // Unknown - could be from any wallet/path
+            label: index === 0 ? 'Active Account' : `Connected Account ${index}`
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
+      }
+    }
+    
+    return [...this.accounts];
+  }
+
+  async switchAccount(address: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error('Wallet not connected');
+    }
+
+    const accountIndex = this.accounts.findIndex(
+      acc => acc.address.toLowerCase() === address.toLowerCase()
+    );
+
+    if (accountIndex === -1) {
+      throw new Error(`Account ${address} not found`);
+    }
+
+    this.activeAccountIndex = accountIndex;
+  }
+
+  async getActiveAccount(): Promise<Account | null> {
+    if (!this.connected || this.accounts.length === 0) {
+      return null;
+    }
+    return this.accounts[this.activeAccountIndex];
   }
 
   async getBalances(): Promise<WalletBalance[]> {
-    if (!this.provider || !this.signer) {
+    const activeAccount = await this.getActiveAccount();
+    if (!activeAccount) {
+      throw new Error('No active account');
+    }
+    return this.getBalancesForAccount(activeAccount.address);
+  }
+
+  async getBalancesForAccount(address: string): Promise<WalletBalance[]> {
+    if (!this.provider) {
       throw new Error('Wallet not connected');
     }
 
-    const address = await this.getAddress();
     const balances: WalletBalance[] = [];
 
     const nativeBalance = await this.getNativeBalance(address);

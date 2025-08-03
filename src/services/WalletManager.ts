@@ -1,56 +1,92 @@
 import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
+import { v4 as uuidv4 } from 'uuid';
 import { 
   MultiChainWalletManager, 
   WalletConnection, 
   WalletBalance,
-  WalletIntegration 
+  WalletIntegration,
+  WalletInstance,
+  Account
 } from '../types';
 import { EVMWalletIntegration } from '../chains/evm/EVMWalletIntegration';
 import { SolanaWalletIntegration } from '../chains/solana/SolanaWalletIntegration';
 import { SuiWalletIntegration } from '../chains/sui/SuiWalletIntegration';
 import { EVM_CHAINS } from '../utils/constants';
 
+interface WalletData {
+  instance: WalletInstance;
+  integrations: Map<Chain, WalletIntegration>;
+  connections: Map<Chain, WalletConnection>;
+}
+
 export class WalletManager implements MultiChainWalletManager {
-  private wallets: Map<Chain, WalletIntegration> = new Map();
-  private connections: Map<Chain, WalletConnection> = new Map();
+  private wallets: Map<string, WalletData> = new Map();
+  private activeWalletId: string | null = null;
 
   async connectWallet(
     chain: Chain, 
     source: IntegrationSource
   ): Promise<WalletConnection> {
-    let wallet = this.wallets.get(chain);
-
-    if (!wallet) {
-      wallet = this.createWalletIntegration(chain, source);
-      this.wallets.set(chain, wallet);
+    // Get or create active wallet
+    if (!this.activeWalletId) {
+      const newWallet = await this.addWallet();
+      this.activeWalletId = newWallet.id;
     }
 
-    const connection = await wallet.connect();
-    this.connections.set(chain, connection);
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) {
+      throw new Error('No active wallet');
+    }
+
+    let integration = walletData.integrations.get(chain);
+
+    if (!integration) {
+      integration = this.createWalletIntegration(chain, source);
+      walletData.integrations.set(chain, integration);
+    }
+
+    const connection = await integration.connect();
+    walletData.connections.set(chain, connection);
+
+    // Update wallet instance with accounts from this chain
+    if (connection.accounts) {
+      // Merge accounts, avoiding duplicates
+      const existingAddresses = new Set(walletData.instance.accounts.map(a => a.address));
+      const newAccounts = connection.accounts.filter(a => !existingAddresses.has(a.address));
+      walletData.instance.accounts.push(...newAccounts);
+    }
     
     return connection;
   }
 
   async disconnectWallet(chain: Chain): Promise<void> {
-    const wallet = this.wallets.get(chain);
+    if (!this.activeWalletId) return;
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) return;
+
+    const integration = walletData.integrations.get(chain);
     
-    if (wallet) {
-      await wallet.disconnect();
-      this.wallets.delete(chain);
-      this.connections.delete(chain);
+    if (integration) {
+      await integration.disconnect();
+      walletData.integrations.delete(chain);
+      walletData.connections.delete(chain);
     }
   }
 
   async getAllBalances(): Promise<WalletBalance[]> {
     const allBalances: WalletBalance[] = [];
     
-    for (const [chain, wallet] of this.wallets) {
-      if (wallet.isConnected()) {
-        try {
-          const balances = await wallet.getBalances();
-          allBalances.push(...balances);
-        } catch (error) {
-          console.error(`Error fetching balances for ${chain}:`, error);
+    // Get balances from all wallets
+    for (const [walletId, walletData] of this.wallets) {
+      for (const [chain, integration] of walletData.integrations) {
+        if (integration.isConnected()) {
+          try {
+            const balances = await integration.getBalances();
+            allBalances.push(...balances);
+          } catch (error) {
+            console.error(`Error fetching balances for wallet ${walletId}, chain ${chain}:`, error);
+          }
         }
       }
     }
@@ -59,30 +95,144 @@ export class WalletManager implements MultiChainWalletManager {
   }
 
   async getBalancesByChain(chain: Chain): Promise<WalletBalance[]> {
-    const wallet = this.wallets.get(chain);
+    if (!this.activeWalletId) return [];
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) return [];
+
+    const integration = walletData.integrations.get(chain);
     
-    if (!wallet || !wallet.isConnected()) {
+    if (!integration || !integration.isConnected()) {
       return [];
     }
     
-    return wallet.getBalances();
+    return integration.getBalances();
   }
 
   getConnectedWallets(): WalletConnection[] {
-    return Array.from(this.connections.values());
+    if (!this.activeWalletId) return [];
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) return [];
+
+    return Array.from(walletData.connections.values());
   }
 
   async refreshBalances(): Promise<void> {
-    const refreshPromises = Array.from(this.wallets.entries())
-      .filter(([_, wallet]) => wallet.isConnected())
-      .map(([chain, wallet]) => 
-        wallet.getBalances().catch(error => {
-          console.error(`Error refreshing balances for ${chain}:`, error);
-          return [];
-        })
-      );
+    const refreshPromises: Promise<void>[] = [];
+
+    for (const walletData of this.wallets.values()) {
+      for (const [chain, integration] of walletData.integrations) {
+        if (integration.isConnected()) {
+          refreshPromises.push(
+            integration.getBalances().then(() => {}).catch(error => {
+              console.error(`Error refreshing balances for ${chain}:`, error);
+            })
+          );
+        }
+      }
+    }
     
     await Promise.all(refreshPromises);
+  }
+
+  // Multi-wallet management methods
+  getAllWallets(): WalletInstance[] {
+    return Array.from(this.wallets.values()).map(data => data.instance);
+  }
+
+  getWallet(walletId: string): WalletInstance | undefined {
+    return this.wallets.get(walletId)?.instance;
+  }
+
+  async switchWallet(walletId: string): Promise<void> {
+    if (!this.wallets.has(walletId)) {
+      throw new Error(`Wallet ${walletId} not found`);
+    }
+    this.activeWalletId = walletId;
+  }
+
+  async addWallet(name?: string): Promise<WalletInstance> {
+    const walletId = uuidv4();
+    const instance: WalletInstance = {
+      id: walletId,
+      name: name || `Wallet ${this.wallets.size + 1}`,
+      accounts: [],
+      activeAccountIndex: 0,
+      source: IntegrationSource.METAMASK // Default, will be updated on first connection
+    };
+
+    const walletData: WalletData = {
+      instance,
+      integrations: new Map(),
+      connections: new Map()
+    };
+
+    this.wallets.set(walletId, walletData);
+    this.activeWalletId = walletId;
+
+    return instance;
+  }
+
+  async removeWallet(walletId: string): Promise<void> {
+    const walletData = this.wallets.get(walletId);
+    if (!walletData) return;
+
+    // Disconnect all integrations
+    for (const integration of walletData.integrations.values()) {
+      if (integration.isConnected()) {
+        await integration.disconnect();
+      }
+    }
+
+    this.wallets.delete(walletId);
+
+    // If this was the active wallet, switch to another
+    if (this.activeWalletId === walletId) {
+      const remainingWallets = Array.from(this.wallets.keys());
+      this.activeWalletId = remainingWallets.length > 0 ? remainingWallets[0] : null;
+    }
+  }
+
+  // Multi-account methods
+  async getAllAccountsForChain(chain: Chain): Promise<Account[]> {
+    if (!this.activeWalletId) return [];
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) return [];
+
+    const integration = walletData.integrations.get(chain);
+    if (!integration || !integration.isConnected()) {
+      return [];
+    }
+
+    return integration.getAllAccounts();
+  }
+
+  async switchAccountForChain(chain: Chain, address: string): Promise<void> {
+    if (!this.activeWalletId) {
+      throw new Error('No active wallet');
+    }
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) {
+      throw new Error('Wallet not found');
+    }
+
+    const integration = walletData.integrations.get(chain);
+    if (!integration || !integration.isConnected()) {
+      throw new Error(`Chain ${chain} not connected`);
+    }
+
+    await integration.switchAccount(address);
+
+    // Update active account index in wallet instance
+    const accountIndex = walletData.instance.accounts.findIndex(
+      acc => acc.address.toLowerCase() === address.toLowerCase()
+    );
+    if (accountIndex !== -1) {
+      walletData.instance.activeAccountIndex = accountIndex;
+    }
   }
 
   private createWalletIntegration(
@@ -104,22 +254,40 @@ export class WalletManager implements MultiChainWalletManager {
   }
 
   async disconnectAll(): Promise<void> {
-    const disconnectPromises = Array.from(this.wallets.keys()).map(chain => 
-      this.disconnectWallet(chain).catch(error => 
-        console.error(`Error disconnecting ${chain}:`, error)
-      )
-    );
+    const disconnectPromises: Promise<void>[] = [];
+
+    for (const walletData of this.wallets.values()) {
+      for (const [chain, integration] of walletData.integrations) {
+        if (integration.isConnected()) {
+          disconnectPromises.push(
+            integration.disconnect().catch(error => 
+              console.error(`Error disconnecting ${chain}:`, error)
+            )
+          );
+        }
+      }
+    }
     
     await Promise.all(disconnectPromises);
   }
 
   isWalletConnected(chain: Chain): boolean {
-    const wallet = this.wallets.get(chain);
-    return wallet ? wallet.isConnected() : false;
+    if (!this.activeWalletId) return false;
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) return false;
+
+    const integration = walletData.integrations.get(chain);
+    return integration ? integration.isConnected() : false;
   }
 
   getWalletAddress(chain: Chain): string | null {
-    const connection = this.connections.get(chain);
+    if (!this.activeWalletId) return null;
+
+    const walletData = this.wallets.get(this.activeWalletId);
+    if (!walletData) return null;
+
+    const connection = walletData.connections.get(chain);
     return connection ? connection.address : null;
   }
 
@@ -205,6 +373,67 @@ export class WalletManager implements MultiChainWalletManager {
       }
     }
     
+    return results;
+  }
+
+  /**
+   * Get balances for all accounts across all connected chains
+   */
+  async getAllAccountBalances(): Promise<{
+    [walletId: string]: {
+      wallet: WalletInstance;
+      balancesByAccount: {
+        [address: string]: {
+          account: Account;
+          balances: WalletBalance[];
+        }
+      }
+    }
+  }> {
+    const results: any = {};
+
+    for (const [walletId, walletData] of this.wallets) {
+      const walletResult: any = {
+        wallet: walletData.instance,
+        balancesByAccount: {}
+      };
+
+      // Get all unique accounts across all chains
+      const allAccounts = new Map<string, Account>();
+      
+      for (const [_, integration] of walletData.integrations) {
+        if (integration.isConnected()) {
+          const accounts = await integration.getAllAccounts();
+          accounts.forEach(acc => {
+            allAccounts.set(acc.address, acc);
+          });
+        }
+      }
+
+      // Get balances for each account
+      for (const [address, account] of allAccounts) {
+        const accountBalances: WalletBalance[] = [];
+
+        for (const [chain, integration] of walletData.integrations) {
+          if (integration.isConnected()) {
+            try {
+              const balances = await integration.getBalancesForAccount(address);
+              accountBalances.push(...balances);
+            } catch (error) {
+              console.error(`Error fetching balances for ${address} on ${chain}:`, error);
+            }
+          }
+        }
+
+        walletResult.balancesByAccount[address] = {
+          account,
+          balances: accountBalances
+        };
+      }
+
+      results[walletId] = walletResult;
+    }
+
     return results;
   }
 }
