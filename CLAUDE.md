@@ -76,3 +76,42 @@ Tests use Vitest and focus on unit testing without requiring actual wallet conne
 2. All operations must be read-only (no transaction signing)
 3. The library is designed to work in browsers only, not Node.js environments
 4. When the data-models interfaces don't match needs, create local types rather than breaking compatibility
+
+## DDD Agent Usage Guidelines
+
+When working with this codebase, use the appropriate Domain-Driven Design agents for different tasks:
+
+### ddd-enterprise-architect
+Use for strategic architectural decisions such as:
+- Defining bounded contexts for wallet integrations vs portfolio aggregation
+- Establishing communication patterns between wallet services and portfolio calculators
+- Decomposing the system into domains (e.g., wallet domain, pricing domain, portfolio domain)
+- Defining ubiquitous language for blockchain concepts
+
+### ddd-domain-architect
+Use for domain-specific implementation guidance:
+- Designing the wallet integration bounded context with proper aggregates
+- Defining contracts between the wallet integration module and external systems
+- Establishing API boundaries between different chain implementations
+- Translating enterprise patterns to the wallet/portfolio domain
+
+### ddd-system-architect
+Use for internal system architecture within this repository:
+- Module structure for wallet integrations (adapters, services, managers)
+- Library selection for blockchain interactions
+- E2E test scenarios for wallet connections
+- Evaluating state management patterns for multi-chain data
+
+### ddd-unit-architect
+Use for granular code-level design:
+- Designing individual wallet integration classes and their methods
+- Creating value objects for blockchain addresses and token amounts
+- Defining unit test specifications for wallet adapters
+- Structuring error handling and retry logic
+
+### ddd-software-engineer
+Use for implementing architectural designs:
+- Writing wallet integration code based on unit architect specifications
+- Implementing unit tests for wallet services
+- Creating value objects and domain entities
+- Refactoring existing code to follow DDD patterns
