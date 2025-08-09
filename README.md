@@ -5,7 +5,7 @@ Multi-chain wallet integration system for CygnusWealth that handles read-only wa
 ## Features
 
 - **Multi-Chain Support**: Ethereum, BSC, Polygon, Arbitrum, Optimism, Avalanche, Base, Solana, and SUI
-- **Wallet Integrations**: MetaMask/Rabby (EVM), Phantom (Solana), Suiet (SUI)
+- **Wallet Integrations**: MetaMask/Rabby (EVM), Phantom (Solana), Slush/Suiet (SUI)
 - **Balance Aggregation**: Fetch native and token balances across all connected wallets
 - **Token Price Service**: Real-time price fetching with caching via CoinGecko API
 - **Portfolio Calculation**: Calculate total portfolio value with chain and asset breakdowns
@@ -85,6 +85,90 @@ const evmWallet = new EVMWalletIntegration(Chain.ETHEREUM, IntegrationSource.MET
 await evmWallet.connect();
 const balances = await evmWallet.getBalances();
 ```
+
+### Solana WebSocket Real-time Updates
+
+```typescript
+import { SolanaWalletIntegration } from '@cygnus-wealth/wallet-integration-system';
+
+const solanaWallet = new SolanaWalletIntegration();
+
+// Connect to wallet
+const connection = await solanaWallet.connect();
+
+// Subscribe to real-time balance updates
+const unsubscribe = await solanaWallet.subscribeToBalances(
+  connection.address,
+  (balances) => {
+    console.log('Balance updated:', balances);
+  }
+);
+
+// Check connection status
+const status = solanaWallet.getConnectionStatus();
+console.log('Using WebSocket:', status.isWebSocket);
+console.log('Current endpoint:', status.rpcEndpoint);
+
+// Manual reconnection if needed
+await solanaWallet.reconnect();
+
+// Cleanup when done
+unsubscribe();
+await solanaWallet.disconnect();
+```
+
+### SUI WebSocket Real-time Updates
+
+```typescript
+import { SuiWalletIntegration } from '@cygnus-wealth/wallet-integration-system';
+
+const suiWallet = new SuiWalletIntegration(Chain.SUI, IntegrationSource.SUIET);
+
+// Connect to wallet
+const connection = await suiWallet.connect();
+
+// Subscribe to real-time balance updates
+const unsubscribe = await suiWallet.subscribeToBalances(
+  connection.address,
+  (balances) => {
+    console.log('Balance updated:', balances);
+  }
+);
+
+// Check connection status
+const status = suiWallet.getConnectionStatus();
+console.log('Using WebSocket:', status.isWebSocket);
+console.log('Current endpoint:', status.rpcEndpoint);
+
+// Manual reconnection if needed
+await suiWallet.reconnect();
+
+// Cleanup when done
+unsubscribe();
+await suiWallet.disconnect();
+```
+
+## Supported Wallets
+
+### EVM Chains (Ethereum, BSC, Polygon, etc.)
+- **MetaMask** - Primary EVM wallet support
+- **Rabby** - Works via same interface as MetaMask
+- Any wallet that injects `window.ethereum`
+
+### Solana
+- **Phantom** - Primary Solana wallet
+- **WebSocket Support** - Real-time balance updates via WebSocket connections
+- **Multiple RPC Endpoints** - Automatic failover across multiple endpoints
+- **Robust Reconnection** - Exponential backoff with HTTP polling fallback
+
+### Sui
+- **Slush** (formerly Sui Wallet) - Official Sui wallet by Mysten Labs
+- **Suiet** - Alternative Sui wallet
+- **WebSocket Support** - Real-time balance updates via WebSocket connections
+- **Multiple RPC Endpoints** - Automatic failover across multiple endpoints
+- **Robust Reconnection** - Exponential backoff with HTTP polling fallback
+
+Note: The library automatically detects available wallets. For Sui, it supports both the legacy window injection method (Suiet) and the modern Wallet Standard (Slush).
 
 ## API Reference
 
