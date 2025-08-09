@@ -77,10 +77,17 @@ export class SolanaWalletIntegration implements WalletIntegration {
     public source: IntegrationSource = IntegrationSource.PHANTOM,
     config?: WalletIntegrationConfig
   ) {
-    // Initialize RPC endpoints
+    // Initialize RPC endpoints, converting any ws/wss URLs to http/https
     if (config?.rpcUrl) {
+      let rpcUrl = config.rpcUrl;
+      // Convert WebSocket URLs to HTTP URLs for the Connection constructor
+      if (rpcUrl.startsWith('wss://')) {
+        rpcUrl = rpcUrl.replace('wss://', 'https://');
+      } else if (rpcUrl.startsWith('ws://')) {
+        rpcUrl = rpcUrl.replace('ws://', 'http://');
+      }
       // If custom RPC URL provided, use it as primary with defaults as fallback
-      this.rpcEndpoints = [config.rpcUrl, ...DEFAULT_RPC_ENDPOINTS];
+      this.rpcEndpoints = [rpcUrl, ...DEFAULT_RPC_ENDPOINTS];
     } else {
       this.rpcEndpoints = [...DEFAULT_RPC_ENDPOINTS];
     }
@@ -375,12 +382,15 @@ export class SolanaWalletIntegration implements WalletIntegration {
 
   // WebSocket connection management
   private async initializeWebSocketConnection(): Promise<void> {
-    const wsUrl = this.getWebSocketUrl(this.rpcEndpoints[this.connectionState.currentEndpointIndex]);
+    const httpUrl = this.rpcEndpoints[this.connectionState.currentEndpointIndex];
+    const wsUrl = this.getWebSocketUrl(httpUrl);
     
     try {
-      this.wsConnection = new Connection(wsUrl, {
+      // Connection constructor expects HTTP/HTTPS URL, not WebSocket URL
+      // It will handle WebSocket connections internally when using subscription methods
+      this.wsConnection = new Connection(httpUrl, {
         commitment: 'confirmed',
-        wsEndpoint: wsUrl
+        wsEndpoint: wsUrl  // Optionally provide the WebSocket endpoint
       });
 
       // Test the connection
@@ -391,12 +401,12 @@ export class SolanaWalletIntegration implements WalletIntegration {
       this.connectionState.isConnected = true;
       this.connectionState.reconnectAttempts = 0;
 
-      console.log(`WebSocket connected to: ${wsUrl}`);
+      console.log(`Connected to RPC: ${httpUrl} (WebSocket: ${wsUrl})`);
 
       // Set up connection monitoring
       this.monitorConnection();
     } catch (error) {
-      console.warn(`Failed to connect WebSocket to ${wsUrl}:`, error);
+      console.warn(`Failed to connect to ${httpUrl}:`, error);
       await this.handleConnectionFailure();
     }
   }
