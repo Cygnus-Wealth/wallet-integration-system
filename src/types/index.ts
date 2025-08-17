@@ -1,4 +1,4 @@
-import { Balance, Chain, IntegrationSource } from '@cygnus-wealth/data-models';
+import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
 
 export interface Account {
   address: string;
@@ -33,46 +33,26 @@ export interface WalletConnection {
   walletId?: string;
 }
 
-export interface WalletBalance extends Balance {
-  walletAddress: string;
-  chain: Chain;
-  blockNumber?: number;
-  lastUpdated: Date;
-}
 
-export interface TokenInfo {
-  address: string;
-  symbol: string;
-  name: string;
-  decimals: number;
-  chain: Chain;
-  logoURI?: string;
-  coingeckoId?: string;
-}
 
 export interface WalletIntegration {
   connect(): Promise<WalletConnection>;
   disconnect(): Promise<void>;
   getAddress(): Promise<string>;
-  getBalances(): Promise<WalletBalance[]>;
   isConnected(): boolean;
   chain: Chain;
   source: IntegrationSource;
-  // New methods for multi-account support
+  // Multi-account support methods
   getAllAccounts(): Promise<Account[]>;
   switchAccount(address: string): Promise<void>;
   getActiveAccount(): Promise<Account | null>;
-  getBalancesForAccount(address: string): Promise<WalletBalance[]>;
 }
 
 export interface MultiChainWalletManager {
   connectWallet(chain: Chain, source: IntegrationSource): Promise<WalletConnection>;
   disconnectWallet(chain: Chain): Promise<void>;
-  getAllBalances(): Promise<WalletBalance[]>;
-  getBalancesByChain(chain: Chain): Promise<WalletBalance[]>;
   getConnectedWallets(): WalletConnection[];
-  refreshBalances(): Promise<void>;
-  // New methods for multi-wallet management
+  // Multi-wallet management methods
   getAllWallets(): WalletInstance[];
   getWallet(walletId: string): WalletInstance | undefined;
   switchWallet(walletId: string): Promise<void>;
@@ -95,16 +75,6 @@ export interface ChainConfig {
   blockExplorerUrl?: string;
 }
 
-export interface TokenList {
-  name: string;
-  timestamp: string;
-  version: {
-    major: number;
-    minor: number;
-    patch: number;
-  };
-  tokens: TokenInfo[];
-}
 
 export interface WalletIntegrationConfig {
   rpcUrl?: string;

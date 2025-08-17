@@ -85,14 +85,6 @@ describe('Multi-Account Support', () => {
       expect(accounts).toHaveLength(3);
     });
 
-    it('should get balances for specific account', async () => {
-      await walletManager.connectWallet(Chain.ETHEREUM, IntegrationSource.METAMASK);
-      const balances = await walletManager.getBalancesByChain(Chain.ETHEREUM);
-
-      expect(balances).toHaveLength(1); // Only native token
-      expect(balances[0].walletAddress).toBe(mockAccounts[0].toLowerCase());
-      expect(balances[0].asset.symbol).toBe('ETH');
-    });
   });
 
   describe('Multi-Wallet Management', () => {
@@ -162,24 +154,24 @@ describe('Multi-Account Support', () => {
       });
     });
 
-    it('should get all account balances across chains', async () => {
+    it('should get all accounts across chains', async () => {
       await walletManager.connectAllEVMChains();
-      const allBalances = await walletManager.getAllAccountBalances();
+      const allAccounts = await walletManager.getAllAccounts();
 
-      const walletIds = Object.keys(allBalances);
+      const walletIds = Object.keys(allAccounts);
       expect(walletIds).toHaveLength(1);
 
-      const walletData = allBalances[walletIds[0]];
-      const accountAddresses = Object.keys(walletData.balancesByAccount);
+      const walletData = allAccounts[walletIds[0]];
+      const chains = Object.keys(walletData.accountsByChain);
       
-      // Should have balances for all 3 accounts
-      expect(accountAddresses).toHaveLength(3);
+      // Should have accounts for all connected chains
+      expect(chains.length).toBeGreaterThan(0);
       
-      // Each account should have balances from all connected chains
-      accountAddresses.forEach(address => {
-        const accountData = walletData.balancesByAccount[address];
-        expect(accountData.account).toBeDefined();
-        expect(accountData.balances.length).toBeGreaterThan(0);
+      // Each chain should have the same accounts
+      chains.forEach(chain => {
+        const accounts = walletData.accountsByChain[chain];
+        expect(accounts).toHaveLength(3);
+        expect(accounts[0].address).toBe(mockAccounts[0].toLowerCase());
       });
     });
   });

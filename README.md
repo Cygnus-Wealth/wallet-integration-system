@@ -1,20 +1,20 @@
 # @cygnus-wealth/wallet-integration-system
 
-Multi-chain wallet integration system for CygnusWealth that handles read-only wallet connections and balance fetching across Ethereum/EVM chains, Solana, and SUI.
+Multi-chain wallet integration system for CygnusWealth that handles wallet connections and retrieving network/address information across Ethereum/EVM chains, Solana, and SUI.
 
 ## Features
 
 - **Multi-Chain Support**: Ethereum, BSC, Polygon, Arbitrum, Optimism, Avalanche, Base, Solana, and SUI
 - **Wallet Integrations**: MetaMask/Rabby (EVM), Phantom (Solana), Slush/Suiet (SUI)
-- **Balance Aggregation**: Fetch native and token balances across all connected wallets
-- **Token Price Service**: Real-time price fetching with caching via CoinGecko API
-- **Portfolio Calculation**: Calculate total portfolio value with chain and asset breakdowns
+- **Multi-Account Management**: Support for multiple accounts per wallet
+- **Multi-Wallet Support**: Manage multiple wallet instances
 - **TypeScript Support**: Fully typed with @cygnus-wealth/data-models integration
+- **Read-Only Operations**: Focus on wallet connection and address retrieval only
 
 ## Installation
 
 ```bash
-npm install
+npm install @cygnus-wealth/wallet-integration-system
 ```
 
 ## Usage
@@ -32,47 +32,61 @@ const connection = await walletManager.connectWallet(
   IntegrationSource.METAMASK
 );
 
-// Get all balances
-const balances = await walletManager.getAllBalances();
+console.log('Connected address:', connection.address);
+console.log('Available accounts:', connection.accounts);
+
+// Get all accounts for the chain
+const accounts = await walletManager.getAllAccountsForChain(Chain.ETHEREUM);
 
 // Disconnect wallet
 await walletManager.disconnectWallet(Chain.ETHEREUM);
 ```
 
-### Using Custom RPC Endpoints
+### Multi-Account Support
 
 ```typescript
-import { WalletManager, WalletIntegrationConfig } from '@cygnus-wealth/wallet-integration-system';
+// Get all accounts for a connected chain
+const accounts = await walletManager.getAllAccountsForChain(Chain.ETHEREUM);
 
-// Configure custom RPC (useful for Solana and Sui)
-const config: WalletIntegrationConfig = {
-  rpcUrl: 'https://rpc.ankr.com/solana' // Example: Ankr's Solana RPC
-};
+accounts.forEach(account => {
+  console.log(`Account ${account.index}: ${account.address}`);
+  console.log(`Label: ${account.label}`);
+});
 
-const walletManager = new WalletManager(config);
-
-// Connect with custom RPC
-await walletManager.connectWallet(Chain.SOLANA, IntegrationSource.PHANTOM);
+// Switch to a different account
+if (accounts.length > 1) {
+  await walletManager.switchAccountForChain(Chain.ETHEREUM, accounts[1].address);
+}
 ```
 
-### Portfolio Value Calculation
+### Multi-Wallet Management
 
 ```typescript
-import { PortfolioCalculator } from '@cygnus-wealth/wallet-integration-system';
+// Add multiple wallets
+const personalWallet = await walletManager.addWallet('Personal');
+const businessWallet = await walletManager.addWallet('Business');
 
-const calculator = new PortfolioCalculator();
-const balances = await walletManager.getAllBalances();
+// Switch between wallets
+await walletManager.switchWallet(businessWallet.id);
 
-// Calculate portfolio with prices
-const portfolio = await calculator.calculatePortfolioValue(balances);
+// Get all wallets
+const wallets = walletManager.getAllWallets();
 
-console.log('Total Value:', portfolio.totalValue.amount);
+// Remove a wallet
+await walletManager.removeWallet(personalWallet.id);
+```
 
-// Get chain breakdown
-const chainBreakdown = calculator.calculateChainBreakdown(portfolio);
+### Connect to All EVM Chains
 
-// Get top assets
-const topAssets = calculator.getTopAssets(portfolio, 5);
+```typescript
+// Connect to all supported EVM chains with a single call
+const { connections } = await walletManager.connectAllEVMChains(
+  IntegrationSource.METAMASK
+);
+
+connections.forEach(conn => {
+  console.log(`Connected to ${conn.chain}: ${conn.address}`);
+});
 ```
 
 ### Direct Chain Integration
@@ -82,70 +96,8 @@ import { EVMWalletIntegration, Chain, IntegrationSource } from '@cygnus-wealth/w
 
 // Direct EVM integration
 const evmWallet = new EVMWalletIntegration(Chain.ETHEREUM, IntegrationSource.METAMASK);
-await evmWallet.connect();
-const balances = await evmWallet.getBalances();
-```
-
-### Solana WebSocket Real-time Updates
-
-```typescript
-import { SolanaWalletIntegration } from '@cygnus-wealth/wallet-integration-system';
-
-const solanaWallet = new SolanaWalletIntegration();
-
-// Connect to wallet
-const connection = await solanaWallet.connect();
-
-// Subscribe to real-time balance updates
-const unsubscribe = await solanaWallet.subscribeToBalances(
-  connection.address,
-  (balances) => {
-    console.log('Balance updated:', balances);
-  }
-);
-
-// Check connection status
-const status = solanaWallet.getConnectionStatus();
-console.log('Using WebSocket:', status.isWebSocket);
-console.log('Current endpoint:', status.rpcEndpoint);
-
-// Manual reconnection if needed
-await solanaWallet.reconnect();
-
-// Cleanup when done
-unsubscribe();
-await solanaWallet.disconnect();
-```
-
-### SUI WebSocket Real-time Updates
-
-```typescript
-import { SuiWalletIntegration } from '@cygnus-wealth/wallet-integration-system';
-
-const suiWallet = new SuiWalletIntegration(Chain.SUI, IntegrationSource.SUIET);
-
-// Connect to wallet
-const connection = await suiWallet.connect();
-
-// Subscribe to real-time balance updates
-const unsubscribe = await suiWallet.subscribeToBalances(
-  connection.address,
-  (balances) => {
-    console.log('Balance updated:', balances);
-  }
-);
-
-// Check connection status
-const status = suiWallet.getConnectionStatus();
-console.log('Using WebSocket:', status.isWebSocket);
-console.log('Current endpoint:', status.rpcEndpoint);
-
-// Manual reconnection if needed
-await suiWallet.reconnect();
-
-// Cleanup when done
-unsubscribe();
-await suiWallet.disconnect();
+const connection = await evmWallet.connect();
+const accounts = await evmWallet.getAllAccounts();
 ```
 
 ## Supported Wallets
@@ -157,16 +109,10 @@ await suiWallet.disconnect();
 
 ### Solana
 - **Phantom** - Primary Solana wallet
-- **WebSocket Support** - Real-time balance updates via WebSocket connections
-- **Multiple RPC Endpoints** - Automatic failover across multiple endpoints
-- **Robust Reconnection** - Exponential backoff with HTTP polling fallback
 
 ### Sui
 - **Slush** (formerly Sui Wallet) - Official Sui wallet by Mysten Labs
 - **Suiet** - Alternative Sui wallet
-- **WebSocket Support** - Real-time balance updates via WebSocket connections
-- **Multiple RPC Endpoints** - Automatic failover across multiple endpoints
-- **Robust Reconnection** - Exponential backoff with HTTP polling fallback
 
 Note: The library automatically detects available wallets. For Sui, it supports both the legacy window injection method (Suiet) and the modern Wallet Standard (Slush).
 
@@ -176,35 +122,77 @@ Note: The library automatically detects available wallets. For Sui, it supports 
 
 Main class for managing multi-chain wallet connections.
 
+#### Methods
+
 - `connectWallet(chain: Chain, source: IntegrationSource): Promise<WalletConnection>`
+  - Connect to a specific blockchain wallet
+
 - `disconnectWallet(chain: Chain): Promise<void>`
-- `getAllBalances(): Promise<WalletBalance[]>`
-- `getBalancesByChain(chain: Chain): Promise<WalletBalance[]>`
+  - Disconnect from a specific chain
+
 - `getConnectedWallets(): WalletConnection[]`
-- `refreshBalances(): Promise<void>`
+  - Get all currently connected wallets
 
-### TokenPriceService
+- `getAllAccountsForChain(chain: Chain): Promise<Account[]>`
+  - Get all accounts for a specific chain
 
-Singleton service for fetching token prices.
+- `switchAccountForChain(chain: Chain, address: string): Promise<void>`
+  - Switch to a different account on a chain
 
-- `getTokenPrice(address: string, chain: Chain, coingeckoId?: string): Promise<Price | null>`
-- `getMultipleTokenPrices(tokens: TokenInfo[]): Promise<Map<string, Price>>`
+- `connectAllEVMChains(source?: IntegrationSource): Promise<{ connections: WalletConnection[] }>`
+  - Connect to all EVM chains at once
 
-### PortfolioCalculator
+- `isWalletConnected(chain: Chain): boolean`
+  - Check if a wallet is connected for a specific chain
 
-Utility class for portfolio calculations.
+- `getWalletAddress(chain: Chain): string | null`
+  - Get the connected address for a specific chain
 
-- `calculatePortfolioValue(balances: WalletBalance[]): Promise<Portfolio>`
-- `calculateChainBreakdown(portfolio: Portfolio): Map<Chain, BreakdownInfo>`
-- `getTopAssets(portfolio: Portfolio, limit: number): PortfolioItem[]`
+- `getAllWallets(): WalletInstance[]`
+  - Get all wallet instances
+
+- `addWallet(name?: string): Promise<WalletInstance>`
+  - Add a new wallet instance
+
+- `removeWallet(walletId: string): Promise<void>`
+  - Remove a wallet instance
+
+- `switchWallet(walletId: string): Promise<void>`
+  - Switch to a different wallet instance
+
+### Types
+
+```typescript
+interface WalletConnection {
+  address: string;
+  chain: Chain;
+  source: IntegrationSource;
+  connected: boolean;
+  connectedAt?: Date;
+  accounts?: Account[];
+  activeAccount?: Account;
+}
+
+interface Account {
+  address: string;
+  index: number;
+  derivationPath?: string;
+  label?: string;
+}
+
+interface WalletInstance {
+  id: string;
+  name?: string;
+  accounts: Account[];
+  activeAccountIndex: number;
+  source: IntegrationSource;
+}
+```
 
 ## Data Model Integration
 
 This library uses `@cygnus-wealth/data-models` for standardized data structures:
 
-- `Balance`: Token balance information
-- `Asset`: Token/asset details
-- `Portfolio`: Aggregated portfolio data
 - `Chain`: Supported blockchain networks
 - `IntegrationSource`: Wallet providers
 
@@ -241,3 +229,19 @@ npm test
 # Type checking
 npm run typecheck
 ```
+
+## Architecture
+
+This library is designed to be a read-only wallet integration system, focusing solely on:
+- Connecting to wallets
+- Retrieving wallet addresses
+- Managing multiple accounts
+- Switching between networks
+
+The library does NOT handle:
+- Balance fetching (this should be done through separate blockchain data providers)
+- Transaction signing
+- Private key management
+- Token transfers
+
+This separation of concerns ensures the library remains focused, secure, and maintainable.

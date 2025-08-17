@@ -113,14 +113,3 @@ export const EVM_CHAINS = [
   Chain.BASE
 ];
 
-export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-
-export const DEFAULT_TOKEN_LISTS = {
-  [Chain.ETHEREUM]: 'https://tokens.coingecko.com/uniswap/all.json',
-  [Chain.BSC]: 'https://tokens.pancakeswap.finance/pancakeswap-extended.json',
-  [Chain.POLYGON]: 'https://api-polygon-tokens.polygon.technology/tokenlists/default.tokenlist.json',
-  [Chain.ARBITRUM]: 'https://bridge.arbitrum.io/token-list-42161.json',
-  [Chain.OPTIMISM]: 'https://static.optimism.io/optimism.tokenlist.json',
-  [Chain.AVALANCHE]: 'https://raw.githubusercontent.com/traderjoe-xyz/joe-tokenlists/main/joe.tokenlist.json',
-  [Chain.BASE]: 'https://tokens.coingecko.com/base/all.json'
-};

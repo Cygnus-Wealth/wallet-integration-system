@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { 
   MultiChainWalletManager, 
   WalletConnection, 
-  WalletBalance,
   WalletIntegration,
   WalletInstance,
   Account,
@@ -80,41 +79,6 @@ export class WalletManager implements MultiChainWalletManager {
     }
   }
 
-  async getAllBalances(): Promise<WalletBalance[]> {
-    const allBalances: WalletBalance[] = [];
-    
-    // Get balances from all wallets
-    for (const [walletId, walletData] of this.wallets) {
-      for (const [chain, integration] of walletData.integrations) {
-        if (integration.isConnected()) {
-          try {
-            const balances = await integration.getBalances();
-            allBalances.push(...balances);
-          } catch (error) {
-            console.error(`Error fetching balances for wallet ${walletId}, chain ${chain}:`, error);
-          }
-        }
-      }
-    }
-    
-    return allBalances;
-  }
-
-  async getBalancesByChain(chain: Chain): Promise<WalletBalance[]> {
-    if (!this.activeWalletId) return [];
-
-    const walletData = this.wallets.get(this.activeWalletId);
-    if (!walletData) return [];
-
-    const integration = walletData.integrations.get(chain);
-    
-    if (!integration || !integration.isConnected()) {
-      return [];
-    }
-    
-    return integration.getBalances();
-  }
-
   getConnectedWallets(): WalletConnection[] {
     if (!this.activeWalletId) return [];
 
@@ -122,24 +86,6 @@ export class WalletManager implements MultiChainWalletManager {
     if (!walletData) return [];
 
     return Array.from(walletData.connections.values());
-  }
-
-  async refreshBalances(): Promise<void> {
-    const refreshPromises: Promise<void>[] = [];
-
-    for (const walletData of this.wallets.values()) {
-      for (const [chain, integration] of walletData.integrations) {
-        if (integration.isConnected()) {
-          refreshPromises.push(
-            integration.getBalances().then(() => {}).catch(error => {
-              console.error(`Error refreshing balances for ${chain}:`, error);
-            })
-          );
-        }
-      }
-    }
-    
-    await Promise.all(refreshPromises);
   }
 
   // Multi-wallet management methods
@@ -298,15 +244,13 @@ export class WalletManager implements MultiChainWalletManager {
   }
 
   /**
-   * Connects to all EVM chains available in the wallet and fetches balances.
+   * Connects to all EVM chains available in the wallet.
    * This uses the same address across all EVM chains.
    */
   async connectAllEVMChains(source: IntegrationSource = IntegrationSource.METAMASK): Promise<{
     connections: WalletConnection[];
-    balances: WalletBalance[];
   }> {
     const connections: WalletConnection[] = [];
-    const balances: WalletBalance[] = [];
     
     // First connect to one chain to get the address
     const firstChain = EVM_CHAINS[0];
@@ -325,74 +269,17 @@ export class WalletManager implements MultiChainWalletManager {
     const remainingConnections = await Promise.all(connectionPromises);
     connections.push(...remainingConnections.filter(conn => conn !== null) as WalletConnection[]);
     
-    // Fetch balances from all connected chains
-    const balancePromises = connections.map(conn => 
-      this.getBalancesByChain(conn.chain).catch(error => {
-        console.error(`Error fetching balances for ${conn.chain}:`, error);
-        return [];
-      })
-    );
-    
-    const allBalances = await Promise.all(balancePromises);
-    allBalances.forEach(chainBalances => balances.push(...chainBalances));
-    
-    return { connections, balances };
+    return { connections };
   }
 
   /**
-   * Fetches balances from all supported chains without requiring individual connections.
-   * For EVM chains, this connects to all chains automatically using the same address.
+   * Get all accounts across all connected chains and wallets
    */
-  async getAllChainBalances(options?: {
-    evmSource?: IntegrationSource;
-    includeNonEVM?: boolean;
-  }): Promise<{
-    [chain: string]: WalletBalance[];
-  }> {
-    const results: { [chain: string]: WalletBalance[] } = {};
-    
-    // Connect and fetch from all EVM chains
-    if (typeof window !== 'undefined' && window.ethereum) {
-      const evmResult = await this.connectAllEVMChains(
-        options?.evmSource || IntegrationSource.METAMASK
-      );
-      
-      // Group balances by chain
-      for (const balance of evmResult.balances) {
-        if (!results[balance.chain]) {
-          results[balance.chain] = [];
-        }
-        results[balance.chain].push(balance);
-      }
-    }
-    
-    // Optionally include non-EVM chains if already connected
-    if (options?.includeNonEVM) {
-      const nonEVMChains = [Chain.SOLANA, Chain.SUI];
-      for (const chain of nonEVMChains) {
-        if (this.isWalletConnected(chain)) {
-          const balances = await this.getBalancesByChain(chain);
-          if (balances.length > 0) {
-            results[chain] = balances;
-          }
-        }
-      }
-    }
-    
-    return results;
-  }
-
-  /**
-   * Get balances for all accounts across all connected chains
-   */
-  async getAllAccountBalances(): Promise<{
+  async getAllAccounts(): Promise<{
     [walletId: string]: {
       wallet: WalletInstance;
-      balancesByAccount: {
-        [address: string]: {
-          account: Account;
-          balances: WalletBalance[];
-        }
+      accountsByChain: {
+        [chain: string]: Account[];
       }
     }
   }> {
@@ -401,40 +288,19 @@ export class WalletManager implements MultiChainWalletManager {
     for (const [walletId, walletData] of this.wallets) {
       const walletResult: any = {
         wallet: walletData.instance,
-        balancesByAccount: {}
+        accountsByChain: {}
       };
 
-      // Get all unique accounts across all chains
-      const allAccounts = new Map<string, Account>();
-      
-      for (const [_, integration] of walletData.integrations) {
+      for (const [chain, integration] of walletData.integrations) {
         if (integration.isConnected()) {
-          const accounts = await integration.getAllAccounts();
-          accounts.forEach(acc => {
-            allAccounts.set(acc.address, acc);
-          });
-        }
-      }
-
-      // Get balances for each account
-      for (const [address, account] of allAccounts) {
-        const accountBalances: WalletBalance[] = [];
-
-        for (const [chain, integration] of walletData.integrations) {
-          if (integration.isConnected()) {
-            try {
-              const balances = await integration.getBalancesForAccount(address);
-              accountBalances.push(...balances);
-            } catch (error) {
-              console.error(`Error fetching balances for ${address} on ${chain}:`, error);
-            }
+          try {
+            const accounts = await integration.getAllAccounts();
+            walletResult.accountsByChain[chain] = accounts;
+          } catch (error) {
+            console.error(`Error fetching accounts for ${chain}:`, error);
+            walletResult.accountsByChain[chain] = [];
           }
         }
-
-        walletResult.balancesByAccount[address] = {
-          account,
-          balances: accountBalances
-        };
       }
 
       results[walletId] = walletResult;
