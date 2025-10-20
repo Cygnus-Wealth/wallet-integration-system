@@ -22,9 +22,11 @@ The wallet-integration-system provides:
 
 **Out of Scope**: Balance fetching, transaction history, transaction signing, private key handling, portfolio calculation (these belong to other bounded contexts).
 
-## Module Architecture
+## Code Organization
 
-### Core Modules
+This repository is organized as a single npm package with functional directories. The codebase is structured into the following directories:
+
+### Core Directories
 
 ```
 src/
@@ -37,28 +39,28 @@ src/
 └── utils/              # Shared utilities and constants
 ```
 
-### Module Responsibilities
+### Directory Responsibilities
 
-#### Chain Integrations (`src/chains/`)
+#### Chain Integrations Directory (`src/chains/`)
 
-Each chain module implements the provider abstraction pattern:
+Each chain directory implements the provider abstraction pattern:
 
-- **EVM Module** (`chains/evm/`): Handles all EVM-compatible chains through a unified integration
+- **EVM Directory** (`chains/evm/`): Handles all EVM-compatible chains through a unified integration
   - Uses ethers.js for provider abstraction
   - Supports EIP-1193 compliant wallets (MetaMask, Rabby, etc.)
   - Chain-specific configurations in `utils/constants.ts`
 
-- **Solana Module** (`chains/solana/`): Solana-specific wallet integration
+- **Solana Directory** (`chains/solana/`): Solana-specific wallet integration
   - Uses @solana/web3.js for blockchain interaction
   - Supports Phantom wallet provider
 
-- **Sui Module** (`chains/sui/`): Sui blockchain wallet integration
+- **Sui Directory** (`chains/sui/`): Sui blockchain wallet integration
   - Uses @mysten/sui.js SDK
   - Supports Wallet Standard and legacy providers (Slush, Suiet)
 
-**Pattern**: Each module exports a `*WalletIntegration` class implementing the connection lifecycle for that chain family.
+**Pattern**: Each directory exports a `*WalletIntegration` class implementing the connection lifecycle for that chain family.
 
-#### Services Module (`src/services/`)
+#### Services Directory (`src/services/`)
 
 Cross-cutting wallet management services:
 
@@ -268,7 +270,7 @@ Following the Integration Domain testing pyramid (80% unit, 15% integration, 4% 
 ### Extension Points
 
 **Designed for Extension**:
-- Adding new chains: Create new module in `src/chains/`
+- Adding new chains: Create new directory in `src/chains/`
 - Adding new wallet providers: Extend provider detection in integration classes
 - Adding new features: Extend WalletManager facade
 
@@ -286,7 +288,7 @@ See `CLAUDE.md` for complete command reference.
 
 ### Adding a New Chain
 
-1. Create new module in `src/chains/<chain-name>/`
+1. Create new directory in `src/chains/<chain-name>/`
 2. Implement `<ChainName>WalletIntegration` class
 3. Add chain constants to `src/utils/constants.ts`
 4. Update WalletManager to support new chain
@@ -306,7 +308,7 @@ See `CLAUDE.md` for complete command reference.
 ---
 
 **Document Maintenance**: Update this architecture document when:
-- Adding new modules or services
+- Adding new directories or services
 - Changing integration patterns
 - Updating library dependencies
 - Implementing domain architect recommendations
