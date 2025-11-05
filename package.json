@@ -11,6 +11,8 @@
     "test:watch": "vitest watch",
     "test:e2e": "vitest run src/test/e2e/modern-dapp-e2e.test.ts",
     "test:e2e:mock": "tsx src/test/e2e/mock-wallet-test.ts",
+    "demo": "tsx demo/cli-demo.ts",
+    "demo:browser": "firefox demo/index.html",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "link-local": "./scripts/link-local.sh",
