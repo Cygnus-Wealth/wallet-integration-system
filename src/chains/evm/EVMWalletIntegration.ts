@@ -1,15 +1,14 @@
 import { ethers } from 'ethers';
 import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
-import { 
-  WalletIntegration, 
-  WalletConnection, 
+import {
+  WalletIntegration,
+  WalletConnection,
   Account,
-  WalletIntegrationConfig 
+  WalletIntegrationConfig,
+  NetworkEnvironment
 } from '../../types';
-import { 
-  CHAIN_CONFIGS, 
-  EVM_CHAINS 
-} from '../../utils/constants';
+import { EVM_CHAINS } from '../../utils/constants';
+import { getChainConfig } from '../../config/chain-presets';
 import './types';
 
 export class EVMWalletIntegration implements WalletIntegration {
@@ -17,17 +16,17 @@ export class EVMWalletIntegration implements WalletIntegration {
   private connected: boolean = false;
   private accounts: Account[] = [];
   private activeAccountIndex: number = 0;
-  
+  private environment: NetworkEnvironment;
+
   constructor(
     public chain: Chain,
     public source: IntegrationSource,
-    _config?: WalletIntegrationConfig // Unused for EVM as it uses injected provider
+    config?: WalletIntegrationConfig
   ) {
     if (!EVM_CHAINS.includes(chain)) {
       throw new Error(`Chain ${chain} is not an EVM chain`);
     }
-    // EVM wallets use the injected provider (MetaMask, etc.) 
-    // which manages its own RPC connections
+    this.environment = config?.environment ?? NetworkEnvironment.PRODUCTION;
   }
 
   async connect(): Promise<WalletConnection> {
@@ -37,10 +36,10 @@ export class EVMWalletIntegration implements WalletIntegration {
 
     try {
       this.provider = new ethers.BrowserProvider(window.ethereum);
-      
-      const chainConfig = CHAIN_CONFIGS[this.chain];
+
+      const chainConfig = getChainConfig(this.chain, this.environment);
       if (!chainConfig) {
-        throw new Error(`Chain ${this.chain} not configured`);
+        throw new Error(`Chain ${this.chain} not configured for ${this.environment} environment`);
       }
       
       const currentChainId = await window.ethereum.request({ 
@@ -167,9 +166,9 @@ export class EVMWalletIntegration implements WalletIntegration {
       });
     } catch (error: any) {
       if (error.code === 4902) {
-        const chainConfig = CHAIN_CONFIGS[this.chain];
+        const chainConfig = getChainConfig(this.chain, this.environment);
         if (!chainConfig) {
-          throw new Error(`Chain ${this.chain} not configured`);
+          throw new Error(`Chain ${this.chain} not configured for ${this.environment} environment`);
         }
         await window.ethereum!.request({
           method: 'wallet_addEthereumChain',

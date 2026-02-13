@@ -1,5 +1,15 @@
 import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
 
+/**
+ * Network environment for selecting chain presets.
+ * TODO: Replace with NetworkEnvironment from @cygnus-wealth/data-models when da-2dd lands.
+ */
+export enum NetworkEnvironment {
+  PRODUCTION = 'production',
+  TESTNET = 'testnet',
+  LOCAL = 'local'
+}
+
 export interface Account {
   address: string;
   index: number;
@@ -78,5 +88,5 @@ export interface ChainConfig {
 
 export interface WalletIntegrationConfig {
   rpcUrl?: string;
-  // Future configuration options can be added here
+  environment?: NetworkEnvironment;
 }

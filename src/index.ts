@@ -9,6 +9,9 @@ export { SuiWalletIntegration } from './chains/sui/SuiWalletIntegration';
 // Types
 export * from './types';
 
+// Config
+export * from './config/chain-presets';
+
 // Utils
 export * from './utils/constants';
 
