@@ -30,9 +30,17 @@
   ],
   "author": "CygnusWealth",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cygnus-Wealth/wallet-integration-system.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "dependencies": {
-    "@cygnus-wealth/data-models": "^0.0.3",
+    "@cygnus-wealth/data-models": "^1.0.0",
     "@mysten/sui.js": "^0.54.0",
     "@solana/web3.js": "^1.91.0",
     "axios": "^1.6.7",
