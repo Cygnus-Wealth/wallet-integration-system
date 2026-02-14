@@ -35,7 +35,7 @@
     "url": "git+https://github.com/Cygnus-Wealth/wallet-integration-system.git"
   },
   "publishConfig": {
-    "access": "public",
+    "access": "public"
   },
   "type": "module",
   "dependencies": {
