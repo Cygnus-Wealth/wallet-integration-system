@@ -156,12 +156,39 @@ Following the Integration Domain testing pyramid (80% unit, 15% integration, 4% 
 ### E2E Tests (1%)
 
 **Location**: `src/test/e2e/`
+**Configuration**: `vitest.e2e.config.ts` (jsdom environment, 10s timeout, sequential execution)
+**Run**: `npm run test:e2e`
 
-**Focus**: Critical paths only
-- Complete connection flow in browser environment
-- Real wallet extension interactions (testnet)
+#### Enterprise-Defined Scenarios
 
-**Tooling**: Browser automation for wallet interactions
+| Scenario | Priority | Timeout | Status |
+|---|---|---|---|
+| MetaMask detection and connection | P0 | 10s | Covered |
+| Chain switching | P0 | 10s | Covered |
+| Multi-chain connections | P1 | 15s | Covered |
+| Wallet disconnect and reconnect | P1 | 10s | Covered |
+| Provider not available | P1 | 5s | Covered |
+| Multiple provider support | P2 | 15s | Deferred |
+
+#### Infrastructure
+
+- **Mock ethereum provider**: Standardized mock implementing `window.ethereum` with configurable responses for `eth_requestAccounts`, `eth_chainId`, `eth_getBalance`, `wallet_switchEthereumChain`, and `eth_call`
+- **Environment**: jsdom (mock-based tests) — all E2E tests use mocked providers; no real blockchain access
+- **Secondary**: Puppeteer browser tests available in `modern-dapp-e2e.test.ts` for browser injection testing (excluded from default E2E run)
+- **No network calls**: All E2E tests are deterministic and CI-safe
+
+#### Running E2E Tests Locally
+
+```bash
+npm run test:e2e          # Run all E2E tests (jsdom mock-based)
+```
+
+#### Rig-Specific Considerations
+
+- WalletIntegrationSystem is a library (not an app), so E2E tests validate the library API with mocked browser environment rather than testing against real wallet extensions
+- The jsdom approach is preferred over Puppeteer for mock-based tests per enterprise standard
+- All provider interactions are mocked — no testnet wallets or RPC endpoints required
+- Chain switching tests verify the library correctly requests `wallet_switchEthereumChain` for cross-chain operations
 
 ## Security Architecture
 

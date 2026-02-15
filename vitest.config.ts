@@ -15,8 +15,7 @@ export default defineConfig({
       '**/cypress/**',
       '**/.{idea,git,cache,output,temp}/**',
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
-      'src/test/e2e/vitest-e2e.test.ts', // Exclude full MetaMask test
-      'src/test/e2e/puppeteer-wallet-test.ts' // Exclude the main puppeteer test file
+      'src/test/e2e/**' // E2E tests run separately via npm run test:e2e
     ]
   }
 });
