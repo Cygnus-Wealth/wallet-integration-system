@@ -3,6 +3,7 @@ import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
 import { WalletIntegrationFactory } from './WalletIntegrationFactory';
 import { EVMWalletIntegration } from '../chains/evm/EVMWalletIntegration';
 import { CryptoComWalletIntegration } from '../chains/evm/CryptoComWalletIntegration';
+import { TrustWalletIntegration, TRUST_WALLET_SOURCE } from '../chains/evm/TrustWalletIntegration';
 import { SolanaWalletIntegration } from '../chains/solana/SolanaWalletIntegration';
 import { SuiWalletIntegration } from '../chains/sui/SuiWalletIntegration';
 import { ChainNotSupportedError } from '../errors/WalletErrors';
@@ -98,6 +99,50 @@ describe('WalletIntegrationFactory', () => {
       // Assert
       expect(integration).toBeInstanceOf(EVMWalletIntegration);
       expect(integration.chain).toBe(Chain.BASE);
+    });
+
+    it('should create TrustWalletIntegration for Ethereum with Trust Wallet source', () => {
+      // Arrange
+      const factory = new WalletIntegrationFactory();
+
+      // Act
+      const integration = factory.create(Chain.ETHEREUM, TRUST_WALLET_SOURCE);
+
+      // Assert
+      expect(integration).toBeInstanceOf(TrustWalletIntegration);
+      expect(integration.chain).toBe(Chain.ETHEREUM);
+      expect(integration.source).toBe(TRUST_WALLET_SOURCE);
+    });
+
+    it('should create TrustWalletIntegration for BSC with Trust Wallet source', () => {
+      // Arrange
+      const factory = new WalletIntegrationFactory();
+
+      // Act
+      const integration = factory.create(Chain.BSC, TRUST_WALLET_SOURCE);
+
+      // Assert
+      expect(integration).toBeInstanceOf(TrustWalletIntegration);
+      expect(integration.chain).toBe(Chain.BSC);
+    });
+
+    it('should create TrustWalletIntegration for any EVM chain with Trust Wallet source', () => {
+      const factory = new WalletIntegrationFactory();
+      const evmChains = [
+        Chain.ETHEREUM,
+        Chain.POLYGON,
+        Chain.ARBITRUM,
+        Chain.OPTIMISM,
+        Chain.BSC,
+        Chain.AVALANCHE,
+        Chain.BASE
+      ];
+
+      evmChains.forEach(chain => {
+        const integration = factory.create(chain, TRUST_WALLET_SOURCE);
+        expect(integration).toBeInstanceOf(TrustWalletIntegration);
+        expect(integration.chain).toBe(chain);
+      });
     });
 
     it('should create SolanaWalletIntegration for Solana', () => {
