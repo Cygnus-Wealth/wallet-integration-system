@@ -112,4 +112,3 @@ export const EVM_CHAINS = [
   Chain.AVALANCHE,
   Chain.BASE
 ];
-
