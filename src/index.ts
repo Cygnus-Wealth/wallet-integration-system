@@ -3,6 +3,7 @@ export { WalletManager } from './services/WalletManager';
 
 // Chain-specific integrations
 export { EVMWalletIntegration } from './chains/evm/EVMWalletIntegration';
+export { CryptoComWalletIntegration } from './chains/evm/CryptoComWalletIntegration';
 export { SolanaWalletIntegration } from './chains/solana/SolanaWalletIntegration';
 export { SuiWalletIntegration } from './chains/sui/SuiWalletIntegration';
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
 import { WalletIntegrationFactory } from './WalletIntegrationFactory';
 import { EVMWalletIntegration } from '../chains/evm/EVMWalletIntegration';
+import { CryptoComWalletIntegration } from '../chains/evm/CryptoComWalletIntegration';
 import { SolanaWalletIntegration } from '../chains/solana/SolanaWalletIntegration';
 import { SuiWalletIntegration } from '../chains/sui/SuiWalletIntegration';
 import { ChainNotSupportedError } from '../errors/WalletErrors';
@@ -406,6 +407,64 @@ describe('WalletIntegrationFactory', () => {
 
       // Assert
       expect(result).toBe(false);
+    });
+  });
+
+  describe('createCryptoCom', () => {
+    it('should create CryptoComWalletIntegration for Ethereum', () => {
+      // Arrange
+      const factory = new WalletIntegrationFactory();
+
+      // Act
+      const integration = factory.createCryptoCom(Chain.ETHEREUM);
+
+      // Assert
+      expect(integration).toBeInstanceOf(CryptoComWalletIntegration);
+      expect(integration.chain).toBe(Chain.ETHEREUM);
+      expect(integration.source).toBe(IntegrationSource.OTHER);
+    });
+
+    it('should create CryptoComWalletIntegration for all EVM chains', () => {
+      // Arrange
+      const factory = new WalletIntegrationFactory();
+      const evmChains = [
+        Chain.ETHEREUM,
+        Chain.POLYGON,
+        Chain.ARBITRUM,
+        Chain.OPTIMISM,
+        Chain.BSC,
+        Chain.AVALANCHE,
+        Chain.BASE
+      ];
+
+      // Act & Assert
+      evmChains.forEach(chain => {
+        const integration = factory.createCryptoCom(chain);
+        expect(integration).toBeInstanceOf(CryptoComWalletIntegration);
+        expect(integration.chain).toBe(chain);
+      });
+    });
+
+    it('should throw for non-EVM chains', () => {
+      // Arrange
+      const factory = new WalletIntegrationFactory();
+
+      // Act & Assert
+      expect(() => {
+        factory.createCryptoCom(Chain.SOLANA);
+      }).toThrow();
+    });
+
+    it('should pass configuration to integration', () => {
+      // Arrange
+      const factory = new WalletIntegrationFactory();
+      const config = { rpcUrl: 'https://custom-rpc.example.com' };
+
+      // Act
+      const integration = factory.createCryptoCom(Chain.ETHEREUM, config);
+
+      // Assert
+      expect(integration).toBeInstanceOf(CryptoComWalletIntegration);
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
 import { WalletIntegration, WalletIntegrationConfig } from '../types';
 import { EVMWalletIntegration } from '../chains/evm/EVMWalletIntegration';
+import { CryptoComWalletIntegration } from '../chains/evm/CryptoComWalletIntegration';
 import { SolanaWalletIntegration } from '../chains/solana/SolanaWalletIntegration';
 import { SuiWalletIntegration } from '../chains/sui/SuiWalletIntegration';
 import { ChainNotSupportedError } from '../errors/WalletErrors';
@@ -181,5 +182,20 @@ export class WalletIntegrationFactory {
   isEVMChain(chain: Chain): boolean {
     // Return EVM_CHAINS.includes(chain)
     return EVM_CHAINS.includes(chain);
+  }
+
+  /**
+   * Creates a Crypto.com Onchain Wallet integration for the specified EVM chain
+   *
+   * @param chain - The EVM blockchain to connect to
+   * @param config - Optional configuration for the integration
+   * @returns A new CryptoComWalletIntegration instance
+   * @throws {Error} If chain is not an EVM chain
+   */
+  createCryptoCom(
+    chain: Chain,
+    config?: WalletIntegrationConfig
+  ): CryptoComWalletIntegration {
+    return new CryptoComWalletIntegration(chain, IntegrationSource.OTHER, config);
   }
 }
