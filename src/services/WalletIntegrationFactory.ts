@@ -2,6 +2,7 @@ import { Chain, IntegrationSource } from '@cygnus-wealth/data-models';
 import { WalletIntegration, WalletIntegrationConfig } from '../types';
 import { EVMWalletIntegration } from '../chains/evm/EVMWalletIntegration';
 import { CryptoComWalletIntegration } from '../chains/evm/CryptoComWalletIntegration';
+import { TrustWalletIntegration, TRUST_WALLET_SOURCE } from '../chains/evm/TrustWalletIntegration';
 import { SolanaWalletIntegration } from '../chains/solana/SolanaWalletIntegration';
 import { SuiWalletIntegration } from '../chains/sui/SuiWalletIntegration';
 import { ChainNotSupportedError } from '../errors/WalletErrors';
@@ -108,6 +109,9 @@ export class WalletIntegrationFactory {
   ): WalletIntegration {
     // Check if chain is in EVM_CHAINS array
     if (EVM_CHAINS.includes(chain)) {
+      if (source === TRUST_WALLET_SOURCE) {
+        return new TrustWalletIntegration(chain, config);
+      }
       return new EVMWalletIntegration(chain, source, config);
     }
 
