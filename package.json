@@ -1,6 +1,6 @@
 {
   "name": "@cygnus-wealth/wallet-integration-system",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Multi-chain wallet integration system for CygnusWealth",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,7 +17,8 @@
     "link-local": "./scripts/link-local.sh",
     "use-published": "./scripts/use-published.sh",
     "install-hooks": "./scripts/install-hooks.sh",
-    "prepush": "./scripts/pre-push"
+    "prepush": "./scripts/pre-push",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "wallet",
