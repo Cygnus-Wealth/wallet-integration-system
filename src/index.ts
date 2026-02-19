@@ -1,5 +1,8 @@
 // Main exports
 export { WalletManager } from './services/WalletManager';
+export { WalletConnectionService } from './services/WalletConnectionService';
+export type { ConnectWalletOptions } from './services/WalletConnectionService';
+export { WalletIntegrationService } from './services/WalletIntegrationService';
 
 // Chain-specific integrations
 export { EVMWalletIntegration } from './chains/evm/EVMWalletIntegration';

@@ -90,3 +90,6 @@ export interface WalletIntegrationConfig {
   rpcUrl?: string;
   environment?: NetworkEnvironment;
 }
+
+// Multi-wallet multi-account types (en-fr0z)
+export * from './multi-wallet';

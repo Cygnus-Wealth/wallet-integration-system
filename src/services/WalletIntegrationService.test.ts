@@ -226,9 +226,10 @@ describe('WalletIntegrationService', () => {
       integrationService.onAddressRemoved(handler);
 
       const mm = connectMetaMask();
-      connectionService.removeAccount(mm.accounts[0].accountId);
+      const accountId = mm.accounts[0].accountId;
+      connectionService.removeAccount(accountId);
 
-      expect(handler).toHaveBeenCalledWith({ accountId: mm.accounts[0].accountId });
+      expect(handler).toHaveBeenCalledWith({ accountId });
     });
   });
 
