@@ -39,7 +39,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@cygnus-wealth/data-models": "^1.0.0",
+    "@cygnus-wealth/data-models": "^1.2.0",
     "@mysten/sui.js": "^0.54.0",
     "@solana/web3.js": "^1.91.0",
     "axios": "^1.6.7",
