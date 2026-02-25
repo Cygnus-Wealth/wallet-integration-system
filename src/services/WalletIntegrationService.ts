@@ -1,4 +1,4 @@
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { TypedEventEmitter } from '../utils/TypedEventEmitter';
 import { WalletConnectionService } from './WalletConnectionService';
 import {
@@ -39,6 +39,7 @@ export class WalletIntegrationService {
           accountLabel: account.accountLabel,
           connectionLabel: connection.connectionLabel,
           chainScope: account.chainScope,
+          chainFamily: account.chainFamily,
         };
         this.events.emit('addressAdded', { trackedAddress: tracked });
       })
@@ -55,6 +56,7 @@ export class WalletIntegrationService {
           accountLabel: watchAddress.addressLabel,
           connectionLabel: '',
           chainScope: watchAddress.chainScope,
+          chainFamily: watchAddress.chainFamily,
         };
         this.events.emit('addressAdded', { trackedAddress: tracked });
       })
@@ -97,6 +99,7 @@ export class WalletIntegrationService {
           accountLabel: account.accountLabel,
           connectionLabel: connection.connectionLabel,
           chainScope: account.chainScope,
+          chainFamily: account.chainFamily,
         });
       }
     }
@@ -110,6 +113,7 @@ export class WalletIntegrationService {
         accountLabel: watch.addressLabel,
         connectionLabel: '',
         chainScope: watch.chainScope,
+        chainFamily: watch.chainFamily,
       });
     }
 
@@ -118,6 +122,10 @@ export class WalletIntegrationService {
 
   getTrackedAddressesByChain(chain: Chain): TrackedAddress[] {
     return this.getTrackedAddresses().filter(t => t.chainScope.includes(chain));
+  }
+
+  getTrackedAddressesByChainFamily(chainFamily: ChainFamily): TrackedAddress[] {
+    return this.getTrackedAddresses().filter(t => t.chainFamily === chainFamily);
   }
 
   getTrackedAddressesByWallet(connectionId: WalletConnectionId): TrackedAddress[] {
@@ -131,6 +139,11 @@ export class WalletIntegrationService {
 
     const accountIdSet = new Set<AccountId>(group.accountIds);
     return this.getTrackedAddresses().filter(t => accountIdSet.has(t.accountId));
+  }
+
+  getConnectionChainFamilies(connectionId: WalletConnectionId): ChainFamily[] {
+    const connection = this.connectionService.getConnection(connectionId);
+    return [...connection.supportedChainFamilies];
   }
 
   getAccountMetadata(accountId: AccountId): AccountMetadata {
@@ -153,6 +166,7 @@ export class WalletIntegrationService {
         discoveredAt: watch.addedAt,
         isStale: false,
         isActive: false,
+        chainFamily: watch.chainFamily,
       };
     }
 
@@ -171,6 +185,7 @@ export class WalletIntegrationService {
           discoveredAt: account.discoveredAt,
           isStale: account.isStale,
           isActive: account.isActive,
+          chainFamily: account.chainFamily,
         };
       }
     }

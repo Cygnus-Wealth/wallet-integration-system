@@ -1,4 +1,4 @@
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Branded string types ---
@@ -95,6 +95,7 @@ export interface ConnectedAccount {
   address: string;
   accountLabel: string;
   chainScope: Chain[];
+  chainFamily: ChainFamily;
   source: AccountSource;
   discoveredAt: string;
   isStale: boolean;
@@ -114,6 +115,7 @@ export interface MultiWalletConnection {
   accounts: ConnectedAccount[];
   activeAccountAddress: string | null;
   supportedChains: Chain[];
+  supportedChainFamilies: ChainFamily[];
   connectedAt: string;
   lastActiveAt: string;
   sessionStatus: SessionStatus;
@@ -124,6 +126,7 @@ export interface WatchAddress {
   address: string;
   addressLabel: string;
   chainScope: Chain[];
+  chainFamily: ChainFamily;
   addedAt: string;
 }
 
@@ -144,6 +147,7 @@ export interface TrackedAddress {
   accountLabel: string;
   connectionLabel: string;
   chainScope: Chain[];
+  chainFamily: ChainFamily;
 }
 
 export interface AccountMetadata {
@@ -157,6 +161,7 @@ export interface AccountMetadata {
   discoveredAt: string;
   isStale: boolean;
   isActive: boolean;
+  chainFamily: ChainFamily;
 }
 
 // --- Event payload types ---
@@ -214,11 +219,20 @@ export interface AddressChainScopeChangedEvent {
   chains: Chain[];
 }
 
+// --- Chain family events (en-o8w) ---
+
+export interface ChainFamilyConnectionChangedEvent {
+  connectionId: WalletConnectionId;
+  chainFamily: ChainFamily;
+  action: 'added' | 'removed';
+}
+
 // --- Connection options ---
 
 export interface ConnectionOptions {
   label?: string;
   chainScope?: Chain[];
+  chainFamilies?: ChainFamily[];
 }
 
 // --- Provider info ---
