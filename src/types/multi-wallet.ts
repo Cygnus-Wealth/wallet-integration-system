@@ -1,4 +1,4 @@
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Branded string types ---
@@ -35,7 +35,7 @@ export const WALLET_PROVIDER_IDS: readonly WalletProviderId[] = [
 /** Format: `{providerId}:{randomId}` */
 export type WalletConnectionId = string & { readonly __brand: 'WalletConnectionId' };
 
-/** Format: `{walletConnectionId}:{checksummedAddress}` or `watch:{checksummedAddress}` */
+/** Format: `{walletConnectionId}:{chainFamily}:{address}` or `watch:{address}` */
 export type AccountId = string & { readonly __brand: 'AccountId' };
 
 export type SessionStatus = 'active' | 'stale' | 'disconnected';
@@ -48,8 +48,8 @@ export function createWalletConnectionId(providerId: WalletProviderId): WalletCo
   return `${providerId}:${randomId}` as WalletConnectionId;
 }
 
-export function createAccountId(connectionId: WalletConnectionId, address: string): AccountId {
-  return `${connectionId}:${address}` as AccountId;
+export function createAccountId(connectionId: WalletConnectionId, chainFamily: ChainFamily, address: string): AccountId {
+  return `${connectionId}:${chainFamily}:${address}` as AccountId;
 }
 
 export function createWatchAccountId(address: string): AccountId {
@@ -69,21 +69,30 @@ export function parseWalletConnectionId(id: WalletConnectionId): {
 
 export function parseAccountId(id: AccountId): {
   walletConnectionId: WalletConnectionId | 'watch';
+  chainFamily: ChainFamily | undefined;
   address: string;
   isWatch: boolean;
 } {
   if (id.startsWith('watch:')) {
     return {
       walletConnectionId: 'watch',
+      chainFamily: undefined,
       address: id.slice('watch:'.length),
       isWatch: true,
     };
   }
-  // Format: providerId:randomId:address — find last colon for address
-  const lastColon = id.lastIndexOf(':');
+  // Format: providerId:randomId:chainFamily:address
+  // Find the connectionId (providerId:randomId), then chainFamily, then address
+  // providerId:randomId is the first two colon-separated segments
+  const parts = id.split(':');
+  // parts[0] = providerId, parts[1] = randomId, parts[2] = chainFamily, parts[3+] = address
+  const walletConnectionId = `${parts[0]}:${parts[1]}` as WalletConnectionId;
+  const chainFamily = parts[2] as ChainFamily;
+  const address = parts.slice(3).join(':');
   return {
-    walletConnectionId: id.slice(0, lastColon) as WalletConnectionId,
-    address: id.slice(lastColon + 1),
+    walletConnectionId,
+    chainFamily,
+    address,
     isWatch: false,
   };
 }
@@ -94,6 +103,7 @@ export interface ConnectedAccount {
   accountId: AccountId;
   address: string;
   accountLabel: string;
+  chainFamily: ChainFamily;
   chainScope: Chain[];
   source: AccountSource;
   discoveredAt: string;
@@ -114,6 +124,7 @@ export interface MultiWalletConnection {
   accounts: ConnectedAccount[];
   activeAccountAddress: string | null;
   supportedChains: Chain[];
+  supportedChainFamilies: ChainFamily[];
   connectedAt: string;
   lastActiveAt: string;
   sessionStatus: SessionStatus;
@@ -123,6 +134,7 @@ export interface WatchAddress {
   accountId: AccountId;
   address: string;
   addressLabel: string;
+  chainFamily: ChainFamily;
   chainScope: Chain[];
   addedAt: string;
 }
@@ -143,6 +155,7 @@ export interface TrackedAddress {
   providerId: WalletProviderId | 'watch';
   accountLabel: string;
   connectionLabel: string;
+  chainFamily: ChainFamily;
   chainScope: Chain[];
 }
 
@@ -212,6 +225,12 @@ export interface AddressRemovedEvent {
 export interface AddressChainScopeChangedEvent {
   accountId: AccountId;
   chains: Chain[];
+}
+
+export interface ChainFamilyConnectionChangedEvent {
+  connectionId: WalletConnectionId;
+  chainFamily: ChainFamily;
+  action: 'added' | 'removed';
 }
 
 // --- Connection options ---

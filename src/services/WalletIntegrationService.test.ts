@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { WalletConnectionService } from './WalletConnectionService';
 import { WalletIntegrationService } from './WalletIntegrationService';
 import type {
@@ -245,6 +245,67 @@ describe('WalletIntegrationService', () => {
         accountId: mm.accounts[0].accountId,
         chains: [Chain.ETHEREUM],
       });
+    });
+  });
+
+  // --- Chain Family Support (en-o8w) ---
+
+  describe('chain family support', () => {
+    function connectPhantomMultiChain() {
+      const evmConnection = connectionService.connectWallet('phantom',
+        ['0x1111111111111111111111111111111111111111'], {
+          providerName: 'Phantom',
+          providerIcon: 'phantom-icon',
+          supportedChains: [Chain.ETHEREUM],
+          supportedChainFamilies: [ChainFamily.EVM, ChainFamily.SOLANA],
+          chainFamily: ChainFamily.EVM,
+        });
+
+      connectionService.connectChainFamily(evmConnection.connectionId, ChainFamily.SOLANA,
+        ['7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'],
+        [Chain.SOLANA]
+      );
+
+      return evmConnection;
+    }
+
+    it('should include chainFamily in tracked addresses', () => {
+      const mm = connectMetaMask();
+
+      const tracked = integrationService.getTrackedAddresses();
+      expect(tracked[0].chainFamily).toBe(ChainFamily.EVM);
+    });
+
+    it('should filter tracked addresses by chain family', () => {
+      connectPhantomMultiChain();
+
+      const evmAddresses = integrationService.getTrackedAddressesByChainFamily(ChainFamily.EVM);
+      expect(evmAddresses.length).toBe(1);
+      expect(evmAddresses[0].chainFamily).toBe(ChainFamily.EVM);
+
+      const solAddresses = integrationService.getTrackedAddressesByChainFamily(ChainFamily.SOLANA);
+      expect(solAddresses.length).toBe(1);
+      expect(solAddresses[0].chainFamily).toBe(ChainFamily.SOLANA);
+    });
+
+    it('should include chainFamily in watch address tracked addresses', () => {
+      connectionService.addWatchAddress(
+        '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        'Watched',
+        [Chain.ETHEREUM],
+        ChainFamily.EVM,
+      );
+
+      const tracked = integrationService.getTrackedAddresses();
+      expect(tracked[0].chainFamily).toBe(ChainFamily.EVM);
+    });
+
+    it('should return connection chain families', () => {
+      const phantom = connectPhantomMultiChain();
+
+      const families = integrationService.getConnectionChainFamilies(phantom.connectionId);
+      expect(families).toContain(ChainFamily.EVM);
+      expect(families).toContain(ChainFamily.SOLANA);
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { WalletConnectionService } from './WalletConnectionService';
 import type {
   WalletProviderId,
@@ -627,6 +627,179 @@ describe('WalletConnectionService', () => {
 
       expect(mm.accounts[0].accountId).not.toBe(rabby.accounts[0].accountId);
       expect(mm.accounts[0].address).toBe(rabby.accounts[0].address);
+    });
+  });
+
+  // --- Chain Family Support (en-o8w) ---
+
+  describe('chain family support', () => {
+    it('should set supportedChainFamilies on connection', () => {
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+        supportedChainFamilies: [ChainFamily.EVM, ChainFamily.SOLANA],
+      });
+
+      expect(connection.supportedChainFamilies).toEqual([ChainFamily.EVM, ChainFamily.SOLANA]);
+    });
+
+    it('should default supportedChainFamilies to [EVM] when not specified', () => {
+      const connection = service.connectWallet('metamask', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'MetaMask',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+      });
+
+      expect(connection.supportedChainFamilies).toEqual([ChainFamily.EVM]);
+    });
+
+    it('should set chainFamily on accounts when chainFamily is provided', () => {
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+        chainFamily: ChainFamily.EVM,
+      });
+
+      expect(connection.accounts[0].chainFamily).toBe(ChainFamily.EVM);
+    });
+
+    it('should include chainFamily segment in accountId', () => {
+      const connection = service.connectWallet('phantom',
+        ['7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'], {
+          providerName: 'Phantom',
+          providerIcon: '',
+          supportedChains: [Chain.SOLANA],
+          chainFamily: ChainFamily.SOLANA,
+        });
+
+      expect(connection.accounts[0].accountId).toContain(':solana:');
+    });
+
+    it('should connect chain family to existing connection', () => {
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+        supportedChainFamilies: [ChainFamily.EVM],
+        chainFamily: ChainFamily.EVM,
+      });
+
+      service.connectChainFamily(connection.connectionId, ChainFamily.SOLANA,
+        ['7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'],
+        [Chain.SOLANA]
+      );
+
+      const updated = service.getConnection(connection.connectionId);
+      expect(updated.supportedChainFamilies).toContain(ChainFamily.EVM);
+      expect(updated.supportedChainFamilies).toContain(ChainFamily.SOLANA);
+      expect(updated.accounts.length).toBe(2);
+      const solAccount = updated.accounts.find(a => a.chainFamily === ChainFamily.SOLANA);
+      expect(solAccount).toBeDefined();
+      expect(solAccount!.address).toBe('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU');
+    });
+
+    it('should disconnect chain family from existing connection', () => {
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM, Chain.SOLANA],
+        supportedChainFamilies: [ChainFamily.EVM, ChainFamily.SOLANA],
+        chainFamily: ChainFamily.EVM,
+      });
+
+      service.connectChainFamily(connection.connectionId, ChainFamily.SOLANA,
+        ['7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'],
+        [Chain.SOLANA]
+      );
+
+      service.disconnectChainFamily(connection.connectionId, ChainFamily.SOLANA);
+
+      const updated = service.getConnection(connection.connectionId);
+      expect(updated.supportedChainFamilies).not.toContain(ChainFamily.SOLANA);
+      // EVM accounts should remain
+      expect(updated.accounts.some(a => a.chainFamily === ChainFamily.EVM)).toBe(true);
+      // Solana accounts should be removed
+      expect(updated.accounts.some(a => a.chainFamily === ChainFamily.SOLANA)).toBe(false);
+    });
+
+    it('should emit chainFamilyConnectionChanged on connect', () => {
+      const handler = vi.fn();
+      service.onChainFamilyConnectionChanged(handler);
+
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+        supportedChainFamilies: [ChainFamily.EVM],
+        chainFamily: ChainFamily.EVM,
+      });
+
+      service.connectChainFamily(connection.connectionId, ChainFamily.SOLANA,
+        ['7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'],
+        [Chain.SOLANA]
+      );
+
+      expect(handler).toHaveBeenCalledWith(expect.objectContaining({
+        connectionId: connection.connectionId,
+        chainFamily: ChainFamily.SOLANA,
+        action: 'added',
+      }));
+    });
+
+    it('should emit chainFamilyConnectionChanged on disconnect', () => {
+      const handler = vi.fn();
+
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM, Chain.SOLANA],
+        supportedChainFamilies: [ChainFamily.EVM, ChainFamily.SOLANA],
+        chainFamily: ChainFamily.EVM,
+      });
+
+      service.connectChainFamily(connection.connectionId, ChainFamily.SOLANA,
+        ['7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU'],
+        [Chain.SOLANA]
+      );
+
+      service.onChainFamilyConnectionChanged(handler);
+      service.disconnectChainFamily(connection.connectionId, ChainFamily.SOLANA);
+
+      expect(handler).toHaveBeenCalledWith(expect.objectContaining({
+        connectionId: connection.connectionId,
+        chainFamily: ChainFamily.SOLANA,
+        action: 'removed',
+      }));
+    });
+
+    it('should set chainFamily on watch addresses', () => {
+      const watch = service.addWatchAddress(
+        '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        'Vitalik',
+        [Chain.ETHEREUM],
+        ChainFamily.EVM,
+      );
+
+      expect(watch.chainFamily).toBe(ChainFamily.EVM);
+    });
+
+    it('should set chainFamily on manual accounts', () => {
+      const connection = service.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+        chainFamily: ChainFamily.EVM,
+      });
+
+      const account = service.addManualAccountToConnection(
+        connection.connectionId,
+        '0x9999999999999999999999999999999999999999',
+        ChainFamily.EVM,
+      );
+
+      expect(account.chainFamily).toBe(ChainFamily.EVM);
     });
   });
 

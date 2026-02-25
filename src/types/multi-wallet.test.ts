@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import {
   type WalletProviderId,
   type WalletConnectionId,
@@ -61,11 +61,18 @@ describe('Multi-Wallet Multi-Account Types', () => {
   });
 
   describe('createAccountId', () => {
-    it('should create ID in format connectionId:checksummedAddress', () => {
+    it('should create ID in format connectionId:chainFamily:checksummedAddress', () => {
       const connectionId = createWalletConnectionId('metamask');
       const address = '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12';
-      const accountId = createAccountId(connectionId, address);
-      expect(accountId).toBe(`${connectionId}:${address}`);
+      const accountId = createAccountId(connectionId, ChainFamily.EVM, address);
+      expect(accountId).toBe(`${connectionId}:evm:${address}`);
+    });
+
+    it('should include solana chain family segment', () => {
+      const connectionId = createWalletConnectionId('phantom');
+      const address = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+      const accountId = createAccountId(connectionId, ChainFamily.SOLANA, address);
+      expect(accountId).toContain(':solana:');
     });
   });
 
@@ -78,12 +85,24 @@ describe('Multi-Wallet Multi-Account Types', () => {
   });
 
   describe('parseAccountId', () => {
-    it('should parse connected account ID', () => {
+    it('should parse connected account ID with chainFamily', () => {
       const connectionId = 'metamask:abc123' as WalletConnectionId;
       const address = '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12';
-      const accountId = `${connectionId}:${address}` as AccountId;
+      const accountId = `${connectionId}:evm:${address}` as AccountId;
       const parsed = parseAccountId(accountId);
       expect(parsed.walletConnectionId).toBe(connectionId);
+      expect(parsed.chainFamily).toBe(ChainFamily.EVM);
+      expect(parsed.address).toBe(address);
+      expect(parsed.isWatch).toBe(false);
+    });
+
+    it('should parse Solana account ID', () => {
+      const connectionId = 'phantom:xyz789' as WalletConnectionId;
+      const address = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
+      const accountId = `${connectionId}:solana:${address}` as AccountId;
+      const parsed = parseAccountId(accountId);
+      expect(parsed.walletConnectionId).toBe(connectionId);
+      expect(parsed.chainFamily).toBe(ChainFamily.SOLANA);
       expect(parsed.address).toBe(address);
       expect(parsed.isWatch).toBe(false);
     });
@@ -95,15 +114,17 @@ describe('Multi-Wallet Multi-Account Types', () => {
       expect(parsed.walletConnectionId).toBe('watch');
       expect(parsed.address).toBe(address);
       expect(parsed.isWatch).toBe(true);
+      expect(parsed.chainFamily).toBeUndefined();
     });
   });
 
   describe('Type structure validation', () => {
-    it('should create a valid ConnectedAccount', () => {
+    it('should create a valid ConnectedAccount with chainFamily', () => {
       const account: ConnectedAccount = {
-        accountId: 'metamask:abc123:0x1234567890123456789012345678901234567890' as AccountId,
+        accountId: 'metamask:abc123:evm:0x1234567890123456789012345678901234567890' as AccountId,
         address: '0x1234567890123456789012345678901234567890',
         accountLabel: 'Main Account',
+        chainFamily: ChainFamily.EVM,
         chainScope: [Chain.ETHEREUM, Chain.POLYGON],
         source: 'provider',
         discoveredAt: new Date().toISOString(),
@@ -111,11 +132,12 @@ describe('Multi-Wallet Multi-Account Types', () => {
         isActive: true,
       };
       expect(account.accountId).toContain('metamask');
+      expect(account.chainFamily).toBe(ChainFamily.EVM);
       expect(account.source).toBe('provider');
       expect(account.chainScope).toHaveLength(2);
     });
 
-    it('should create a valid MultiWalletConnection', () => {
+    it('should create a valid MultiWalletConnection with chain families', () => {
       const connection: MultiWalletConnection = {
         connectionId: 'metamask:abc123' as WalletConnectionId,
         providerId: 'metamask',
@@ -125,23 +147,27 @@ describe('Multi-Wallet Multi-Account Types', () => {
         accounts: [],
         activeAccountAddress: null,
         supportedChains: [Chain.ETHEREUM],
+        supportedChainFamilies: [ChainFamily.EVM],
         connectedAt: new Date().toISOString(),
         lastActiveAt: new Date().toISOString(),
         sessionStatus: 'active',
       };
       expect(connection.connectionId).toContain('metamask');
       expect(connection.sessionStatus).toBe('active');
+      expect(connection.supportedChainFamilies).toEqual([ChainFamily.EVM]);
     });
 
-    it('should create a valid WatchAddress', () => {
+    it('should create a valid WatchAddress with chainFamily', () => {
       const watch: WatchAddress = {
         accountId: 'watch:0x1234567890123456789012345678901234567890' as AccountId,
         address: '0x1234567890123456789012345678901234567890',
         addressLabel: 'Vitalik',
+        chainFamily: ChainFamily.EVM,
         chainScope: [Chain.ETHEREUM],
         addedAt: new Date().toISOString(),
       };
       expect(watch.accountId).toContain('watch:');
+      expect(watch.chainFamily).toBe(ChainFamily.EVM);
     });
 
     it('should create a valid AccountGroup', () => {
@@ -157,20 +183,22 @@ describe('Multi-Wallet Multi-Account Types', () => {
       expect(group.accountIds).toHaveLength(2);
     });
 
-    it('should create a valid TrackedAddress', () => {
+    it('should create a valid TrackedAddress with chainFamily', () => {
       const tracked: TrackedAddress = {
-        accountId: 'metamask:abc123:0x1234567890123456789012345678901234567890' as AccountId,
+        accountId: 'metamask:abc123:evm:0x1234567890123456789012345678901234567890' as AccountId,
         address: '0x1234567890123456789012345678901234567890',
         walletConnectionId: 'metamask:abc123' as WalletConnectionId,
         providerId: 'metamask',
         accountLabel: 'Main',
         connectionLabel: 'My MetaMask',
+        chainFamily: ChainFamily.EVM,
         chainScope: [Chain.ETHEREUM, Chain.POLYGON],
       };
       expect(tracked.providerId).toBe('metamask');
+      expect(tracked.chainFamily).toBe(ChainFamily.EVM);
     });
 
-    it('should create a valid TrackedAddress for watch address', () => {
+    it('should create a valid TrackedAddress for watch address with chainFamily', () => {
       const tracked: TrackedAddress = {
         accountId: 'watch:0x1234567890123456789012345678901234567890' as AccountId,
         address: '0x1234567890123456789012345678901234567890',
@@ -178,9 +206,11 @@ describe('Multi-Wallet Multi-Account Types', () => {
         providerId: 'watch',
         accountLabel: 'Vitalik',
         connectionLabel: '',
+        chainFamily: ChainFamily.EVM,
         chainScope: [Chain.ETHEREUM],
       };
       expect(tracked.walletConnectionId).toBe('watch');
+      expect(tracked.chainFamily).toBe(ChainFamily.EVM);
     });
 
     it('should create a valid AccountMetadata', () => {
