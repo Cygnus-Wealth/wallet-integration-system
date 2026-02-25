@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { WalletConnectionService } from './WalletConnectionService';
 import { WalletIntegrationService } from './WalletIntegrationService';
 import type {
@@ -245,6 +245,84 @@ describe('WalletIntegrationService', () => {
         accountId: mm.accounts[0].accountId,
         chains: [Chain.ETHEREUM],
       });
+    });
+  });
+
+  // --- Chain Family Queries (en-o8w) ---
+
+  describe('getTrackedAddressesByChainFamily', () => {
+    it('should filter tracked addresses by chain family', () => {
+      connectionService.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM],
+        chainFamilies: [ChainFamily.EVM],
+      });
+
+      connectionService.connectWallet('phantom', ['7x9yZsolanaAddress1234567890123456789012345'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.SOLANA],
+        chainFamilies: [ChainFamily.SOLANA],
+      });
+
+      const evmAddresses = integrationService.getTrackedAddressesByChainFamily(ChainFamily.EVM);
+      expect(evmAddresses).toHaveLength(1);
+      expect(evmAddresses[0].chainFamily).toBe(ChainFamily.EVM);
+
+      const solAddresses = integrationService.getTrackedAddressesByChainFamily(ChainFamily.SOLANA);
+      expect(solAddresses).toHaveLength(1);
+      expect(solAddresses[0].chainFamily).toBe(ChainFamily.SOLANA);
+    });
+
+    it('should return empty for unconnected chain family', () => {
+      connectMetaMask();
+      const suiAddresses = integrationService.getTrackedAddressesByChainFamily(ChainFamily.SUI);
+      expect(suiAddresses).toHaveLength(0);
+    });
+  });
+
+  describe('getConnectionChainFamilies', () => {
+    it('should return chain families for a connection', () => {
+      const mm = connectionService.connectWallet('phantom', ['0x1111111111111111111111111111111111111111'], {
+        providerName: 'Phantom',
+        providerIcon: '',
+        supportedChains: [Chain.ETHEREUM, Chain.SOLANA],
+        chainFamilies: [ChainFamily.EVM, ChainFamily.SOLANA],
+      });
+
+      const families = integrationService.getConnectionChainFamilies(mm.connectionId);
+      expect(families).toContain(ChainFamily.EVM);
+      expect(families).toContain(ChainFamily.SOLANA);
+    });
+  });
+
+  describe('TrackedAddress chainFamily field', () => {
+    it('should include chainFamily in tracked addresses', () => {
+      connectMetaMask();
+      const tracked = integrationService.getTrackedAddresses();
+      expect(tracked[0].chainFamily).toBe(ChainFamily.EVM);
+    });
+
+    it('should include chainFamily in watch address tracked addresses', () => {
+      connectionService.addWatchAddress(
+        '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        'Watched',
+        [Chain.ETHEREUM],
+        ChainFamily.EVM
+      );
+
+      const tracked = integrationService.getTrackedAddresses();
+      const watchAddr = tracked.find(t => t.providerId === 'watch');
+      expect(watchAddr!.chainFamily).toBe(ChainFamily.EVM);
+    });
+  });
+
+  describe('getAccountMetadata with chainFamily', () => {
+    it('should include chainFamily in account metadata', () => {
+      const mm = connectMetaMask();
+      const metadata = integrationService.getAccountMetadata(mm.accounts[0].accountId);
+      expect(metadata.chainFamily).toBe(ChainFamily.EVM);
     });
   });
 
