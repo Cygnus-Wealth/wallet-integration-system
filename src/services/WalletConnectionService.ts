@@ -1,4 +1,4 @@
-import { Chain } from '@cygnus-wealth/data-models';
+import { Chain, ChainFamily } from '@cygnus-wealth/data-models';
 import { v4 as uuidv4 } from 'uuid';
 import { TypedEventEmitter } from '../utils/TypedEventEmitter';
 import {
@@ -19,6 +19,7 @@ import {
   type SessionRestoredEvent,
   type SessionStaleEvent,
   type AddressChainScopeChangedEvent,
+  type ChainFamilyConnectionChangedEvent,
   createWalletConnectionId,
   createAccountId,
   createWatchAccountId,
@@ -38,12 +39,15 @@ interface WalletConnectionEvents {
   watchAddressAdded: { watchAddress: WatchAddress };
   watchAddressRemoved: { accountId: AccountId };
   accountChainScopeChanged: AddressChainScopeChangedEvent;
+  chainFamilyConnectionChanged: ChainFamilyConnectionChangedEvent;
 }
 
 export interface ConnectWalletOptions {
   providerName: string;
   providerIcon: string;
   supportedChains: Chain[];
+  supportedChainFamilies?: ChainFamily[];
+  chainFamily?: ChainFamily;
   label?: string;
   chainScope?: Chain[];
 }
@@ -64,11 +68,14 @@ export class WalletConnectionService {
     const connectionId = createWalletConnectionId(providerId);
     const now = new Date().toISOString();
     const chainScope = options.chainScope ?? options.supportedChains;
+    const chainFamily = options.chainFamily ?? ChainFamily.EVM;
+    const supportedChainFamilies = options.supportedChainFamilies ?? [chainFamily];
 
     const accounts: ConnectedAccount[] = initialAddresses.map((address, index) => ({
-      accountId: createAccountId(connectionId, address),
+      accountId: createAccountId(connectionId, chainFamily, address),
       address,
       accountLabel: this.truncateAddress(address),
+      chainFamily,
       chainScope: [...chainScope],
       source: 'provider' as const,
       discoveredAt: now,
@@ -85,6 +92,7 @@ export class WalletConnectionService {
       accounts,
       activeAccountAddress: initialAddresses[0] ?? null,
       supportedChains: [...options.supportedChains],
+      supportedChainFamilies: [...supportedChainFamilies],
       connectedAt: now,
       lastActiveAt: now,
       sessionStatus: 'active',
@@ -114,11 +122,79 @@ export class WalletConnectionService {
     this.events.emit('chainChanged', { connectionId, chainId });
   }
 
-  // --- Account Accumulation ---
+  // --- Chain Family Lifecycle (en-o8w) ---
 
-  handleAccountsChanged(connectionId: WalletConnectionId, currentAddresses: string[]): void {
+  connectChainFamily(
+    connectionId: WalletConnectionId,
+    chainFamily: ChainFamily,
+    addresses: string[],
+    chains: Chain[],
+  ): void {
     const connection = this.requireConnection(connectionId);
     const now = new Date().toISOString();
+
+    if (!connection.supportedChainFamilies.includes(chainFamily)) {
+      connection.supportedChainFamilies.push(chainFamily);
+    }
+
+    for (const chain of chains) {
+      if (!connection.supportedChains.includes(chain)) {
+        connection.supportedChains.push(chain);
+      }
+    }
+
+    for (const address of addresses) {
+      const account: ConnectedAccount = {
+        accountId: createAccountId(connectionId, chainFamily, address),
+        address,
+        accountLabel: this.truncateAddress(address),
+        chainFamily,
+        chainScope: [...chains],
+        source: 'provider',
+        discoveredAt: now,
+        isStale: false,
+        isActive: false,
+      };
+      connection.accounts.push(account);
+      this.events.emit('accountDiscovered', { connectionId, account });
+    }
+
+    connection.lastActiveAt = now;
+    this.events.emit('chainFamilyConnectionChanged', {
+      connectionId,
+      chainFamily,
+      action: 'added',
+    });
+  }
+
+  disconnectChainFamily(connectionId: WalletConnectionId, chainFamily: ChainFamily): void {
+    const connection = this.requireConnection(connectionId);
+
+    connection.supportedChainFamilies = connection.supportedChainFamilies.filter(
+      f => f !== chainFamily
+    );
+
+    const removedAccounts = connection.accounts.filter(a => a.chainFamily === chainFamily);
+    connection.accounts = connection.accounts.filter(a => a.chainFamily !== chainFamily);
+
+    for (const account of removedAccounts) {
+      this.events.emit('accountRemoved', { accountId: account.accountId });
+    }
+
+    connection.lastActiveAt = new Date().toISOString();
+    this.events.emit('chainFamilyConnectionChanged', {
+      connectionId,
+      chainFamily,
+      action: 'removed',
+    });
+  }
+
+  // --- Account Accumulation ---
+
+  handleAccountsChanged(connectionId: WalletConnectionId, currentAddresses: string[], chainFamily?: ChainFamily): void {
+    const connection = this.requireConnection(connectionId);
+    const now = new Date().toISOString();
+    const effectiveChainFamily = chainFamily ?? connection.supportedChainFamilies[0] ?? ChainFamily.EVM;
     const existingAddresses = new Set(connection.accounts.map(a => a.address));
     const activeAddress = currentAddresses[0] ?? null;
 
@@ -126,9 +202,10 @@ export class WalletConnectionService {
     for (const address of currentAddresses) {
       if (!existingAddresses.has(address)) {
         const account: ConnectedAccount = {
-          accountId: createAccountId(connectionId, address),
+          accountId: createAccountId(connectionId, effectiveChainFamily, address),
           address,
           accountLabel: this.truncateAddress(address),
+          chainFamily: effectiveChainFamily,
           chainScope: [...connection.supportedChains],
           source: 'provider',
           discoveredAt: now,
@@ -190,12 +267,14 @@ export class WalletConnectionService {
     this.events.emit('accountRemoved', { accountId });
   }
 
-  addManualAccountToConnection(connectionId: WalletConnectionId, address: string): ConnectedAccount {
+  addManualAccountToConnection(connectionId: WalletConnectionId, address: string, chainFamily?: ChainFamily): ConnectedAccount {
     const connection = this.requireConnection(connectionId);
+    const effectiveChainFamily = chainFamily ?? connection.supportedChainFamilies[0] ?? ChainFamily.EVM;
     const account: ConnectedAccount = {
-      accountId: createAccountId(connectionId, address),
+      accountId: createAccountId(connectionId, effectiveChainFamily, address),
       address,
       accountLabel: this.truncateAddress(address),
+      chainFamily: effectiveChainFamily,
       chainScope: [...connection.supportedChains],
       source: 'manual',
       discoveredAt: new Date().toISOString(),
@@ -209,12 +288,14 @@ export class WalletConnectionService {
 
   // --- Watch Addresses ---
 
-  addWatchAddress(address: string, label: string, chains: Chain[]): WatchAddress {
+  addWatchAddress(address: string, label: string, chains: Chain[], chainFamily?: ChainFamily): WatchAddress {
     const accountId = createWatchAccountId(address);
+    const effectiveChainFamily = chainFamily ?? ChainFamily.EVM;
     const watch: WatchAddress = {
       accountId,
       address,
       addressLabel: label,
+      chainFamily: effectiveChainFamily,
       chainScope: [...chains],
       addedAt: new Date().toISOString(),
     };
@@ -306,9 +387,10 @@ export class WalletConnectionService {
     this.events.emit('sessionStale', { connectionId });
   }
 
-  restoreSession(connectionId: WalletConnectionId, providerAddresses: string[]): void {
+  restoreSession(connectionId: WalletConnectionId, providerAddresses: string[], chainFamily?: ChainFamily): void {
     const connection = this.requireConnection(connectionId);
     const now = new Date().toISOString();
+    const effectiveChainFamily = chainFamily ?? connection.supportedChainFamilies[0] ?? ChainFamily.EVM;
     const providerSet = new Set(providerAddresses);
     const existingAddresses = new Set(connection.accounts.map(a => a.address));
 
@@ -325,9 +407,10 @@ export class WalletConnectionService {
     for (const address of providerAddresses) {
       if (!existingAddresses.has(address)) {
         const account: ConnectedAccount = {
-          accountId: createAccountId(connectionId, address),
+          accountId: createAccountId(connectionId, effectiveChainFamily, address),
           address,
           accountLabel: this.truncateAddress(address),
+          chainFamily: effectiveChainFamily,
           chainScope: [...connection.supportedChains],
           source: 'provider',
           discoveredAt: now,
@@ -400,6 +483,10 @@ export class WalletConnectionService {
 
   onAccountChainScopeChanged(handler: (event: AddressChainScopeChangedEvent) => void): () => void {
     return this.events.on('accountChainScopeChanged', handler);
+  }
+
+  onChainFamilyConnectionChanged(handler: (event: ChainFamilyConnectionChangedEvent) => void): () => void {
+    return this.events.on('chainFamilyConnectionChanged', handler);
   }
 
   destroy(): void {
